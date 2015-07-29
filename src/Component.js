@@ -1,8 +1,17 @@
+var understudy = require("understudy")
 var hook = require("./hook")
 var registry = require("./registry")
 var delegate = require("./delegate")
 
+registry.set("*", Component)
+
+module.exports = Component
+
 function Component (rootComponentName, root) {
+  if (!(this instanceof Component)) {
+    return new Component(rootComponentName, root)
+  }
+
   this.element = null
   this.components = {}
 
@@ -48,19 +57,23 @@ Component.prototype = {
   assignSubComponents: function (transform) {
     var hostComponent = this
 
-    hook.assignSubComponents(this.components, this.getMainComponentValue(), this.element, transform || function (element, name) {
-      var CustomComponent = registry.exists(name)
-          ? registry.get(name)
-          : registry.get("*") === Component
-            ? null // not a custom component
-            : registry.get("*")
+    hostComponent.perform("assignSubComponents", hostComponent, function () {
+      hook.assignSubComponents(hostComponent.components, hostComponent.getMainComponentValue(), this.element, transform || function (element, name) {
+        var CustomComponent = registry.exists(name)
+            ? registry.get(name)
+            : registry.get("*") === Component
+              ? null // not a custom component
+              : registry.get("*")
 
-      element = CustomComponent
-        // instantiate custom components with host as first argument
-          ? new CustomComponent(hostComponent, element)
-          : new Component(element)
+        element = CustomComponent
+          // instantiate custom components with host as first argument
+            ? new CustomComponent(hostComponent, element)
+            : new Component(element)
 
-      return element
+        return element
+      })
     })
   }
 }
+
+understudy.call(Component.prototype)

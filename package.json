@@ -1,10 +1,12 @@
 {
   "name": "treant",
   "version": "0.1.0",
-  "description": "treant ======",
   "main": "index.js",
+  "description": "Dependency free component library for the browser",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-b": "browserify index.js --standalone treant -o build/treant.js",
+    "build": "npm run build-b"
   },
   "keywords": [
     "A",
@@ -16,5 +18,12 @@
     "browser"
   ],
   "author": "tunderdomb",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "camelcase": "^1.1.0",
+    "understudy": "^4.0.0"
+  },
+  "devDependencies": {
+    "browserify": "^11.0.0"
+  }
 }

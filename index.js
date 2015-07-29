@@ -1,3 +1,4 @@
+var registry = require("./src/registry")
 var register = require("./src/register")
 var component = require("./src/create")
 var Component = require("./src/Component")

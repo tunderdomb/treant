@@ -29,9 +29,8 @@ function findAllComponent (name, root) {
 
 function findSubComponents (name, root) {
   name = camelcase(name)
-  return filter((root || document).querySelectorAll(createComponentSelector()), function (componentValue/*, element*/) {
-    componentValue = componentValue || ""
-    return !!~componentValue.indexOf(":") && componentValue.indexOf(name) === 0
+  return filter((root || document).querySelectorAll(createComponentSelector()), function (element, componentName, mainComponentName, subComponentName) {
+    return subComponentName && name === mainComponentName
   })
 }
 
@@ -54,29 +53,28 @@ function getSubComponentName (element, cc) {
 }
 
 function assignSubComponents (obj, rootComponentName, root, transform) {
-  return findSubComponents(rootComponentName, root)
-      .reduce(function (obj, element) {
-        var name = getSubComponentName(element)
-        if (name) {
-          element = transform
-              ? transform(element, name)
-              : element
-          if (Array.isArray(obj[name])) {
-            obj[name].push(element)
-          }
-          else {
-            obj[name] = element
-          }
-        }
-        return obj
-      }, obj)
+  return findSubComponents(rootComponentName, root).reduce(function (obj, element) {
+    var name = getSubComponentName(element)
+    if (name) {
+      element = transform
+          ? transform(element, name)
+          : element
+      if (Array.isArray(obj[name])) {
+        obj[name].push(element)
+      }
+      else {
+        obj[name] = element
+      }
+    }
+    return obj
+  }, obj)
 }
 
 function filter (elements, filter) {
   switch (typeof filter) {
     case "function":
       return [].slice.call(elements).filter(function (element) {
-        return filter(getComponentName(element), element)
+        return filter(element, getComponentName(element, false), getMainComponentName(element, false), getSubComponentName(element, false))
       })
       break
     case "string":

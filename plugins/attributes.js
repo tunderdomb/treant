@@ -3,6 +3,10 @@ var object = require("../util/object")
 module.exports = function () {
   return function plugin (prototype) {
 
+    prototype.before("create", function () {
+      debugger
+    })
+
     object.method(prototype, "defineAttribute", function (name, def) {
       def = def || {}
       var type
