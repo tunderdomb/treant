@@ -1,5 +1,5 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.treant = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var registry = require("./src/registry")
+var hook = require("./src/hook")
 var register = require("./src/register")
 var component = require("./src/create")
 var Component = require("./src/Component")
@@ -14,6 +14,7 @@ treant.component = component
 treant.Component = Component
 treant.delegate = delegate
 treant.fragment = fragment
+treant.hook = hook
 
 var plugins = {}
 treant.plugins = plugins
@@ -29,7 +30,7 @@ util.extend = require("./util/extend")
 util.merge = require("./util/merge")
 util.object = require("./util/object")
 
-},{"./plugins/attributes":4,"./plugins/dispatcher":5,"./plugins/findBy":6,"./src/Component":7,"./src/create":8,"./src/delegate":9,"./src/fragment":10,"./src/register":12,"./src/registry":13,"./util/extend":14,"./util/merge":15,"./util/object":16}],2:[function(require,module,exports){
+},{"./plugins/attributes":4,"./plugins/dispatcher":5,"./plugins/findBy":6,"./src/Component":7,"./src/create":8,"./src/delegate":9,"./src/fragment":10,"./src/hook":11,"./src/register":12,"./util/extend":14,"./util/merge":15,"./util/object":16}],2:[function(require,module,exports){
 'use strict';
 module.exports = function (str) {
 	str = str.trim();
@@ -349,30 +350,36 @@ var hook = require("./hook")
 var registry = require("./registry")
 var delegate = require("./delegate")
 
-registry.set("*", Component)
-
 module.exports = Component
 
-function Component (rootComponentName, root) {
+function Component (element, options) {
   if (!(this instanceof Component)) {
-    return new Component(rootComponentName, root)
+    return new Component(element, options)
   }
 
-  this.element = null
+  this.element = element || null
   this.components = {}
 
-  if (typeof rootComponentName == "string") {
-    this.element = hook.findComponent(rootComponentName, root)
-  }
-  else if (rootComponentName instanceof Element) {
-    this.element = rootComponentName
-    rootComponentName = this.getMainComponentValue()
-  }
-
-  if (rootComponentName && this.element && this.autoAssign) {
+  if (this.element && this.autoAssign) {
     this.assignSubComponents()
   }
 }
+
+Component.create = function (element, options) {
+  var name = hook.getComponentName(element, false)
+  var ComponentConstructor = null
+
+  if (registry.exists(name)) {
+    ComponentConstructor =  registry.get(name)
+  }
+  else {
+    console.warn("Missing custom component '%s' for ", name, element)
+    ComponentConstructor = registry.get("*") || Component
+  }
+
+  return new ComponentConstructor(element, options)
+}
+
 Component.prototype = {
   autoAssign: true,
 
@@ -391,32 +398,29 @@ Component.prototype = {
   findSubComponents: function (name) {
     return hook.findSubComponents(name, this.element)
   },
-  getComponentValue: function (cc) {
+  getComponentName: function (cc) {
     return hook.getComponentName(this.element, cc)
   },
-  getMainComponentValue: function (cc) {
+  getMainComponentName: function (cc) {
     return hook.getMainComponentName(this.element, cc)
   },
-  getSubComponentValue: function (cc) {
+  getSubComponentName: function (cc) {
     return hook.getSubComponentName(this.element, cc)
+  },
+  clearSubComponents: function () {
+    this.components = {}
   },
   assignSubComponents: function (transform) {
     var hostComponent = this
+    var subComponents = hook.findSubComponents(hostComponent.getMainComponentName(false), hostComponent.element)
+
+    if (!subComponents.length) {
+      return
+    }
 
     hostComponent.perform("assignSubComponents", hostComponent, function () {
-      hook.assignSubComponents(hostComponent.components, hostComponent.getMainComponentValue(), this.element, transform || function (element, name) {
-        var CustomComponent = registry.exists(name)
-            ? registry.get(name)
-            : registry.get("*") === Component
-              ? null // not a custom component
-              : registry.get("*")
-
-        element = CustomComponent
-          // instantiate custom components with host as first argument
-            ? new CustomComponent(hostComponent, element)
-            : new Component(element)
-
-        return element
+      hook.assignSubComponents(hostComponent.components, subComponents, transform || function (element, name) {
+        return Component.create(element, hostComponent)
       })
     })
   }
@@ -427,22 +431,33 @@ understudy.call(Component.prototype)
 },{"./delegate":9,"./hook":11,"./registry":13,"understudy":3}],8:[function(require,module,exports){
 var Component = require("./Component")
 var hook = require("./hook")
-var registry = require("./registry")
 
 module.exports = component
 
-function component (rootComponentName, root) {
-  if (typeof rootComponentName != "string") {
-    rootComponentName = hook.getMainComponentName(rootComponentName)
-  }
-  var ComponentConstructor = registry.exists(rootComponentName)
-    ? registry.get(rootComponentName)
-    : Component
+function component (name, root, options) {
+  var element = null
 
-  return new ComponentConstructor(rootComponentName, root)
+  // component("string")
+  if (typeof name == "string") {
+    // component("string"[, {}])
+    if (!(root instanceof Element)) {
+      options = root
+      root = null
+    }
+    // component("string", Element)
+    element = hook.findComponent(name, root)
+  }
+  // component(Element[, {}])
+  else if (name instanceof Element) {
+    element = name
+    options = root
+    root = null
+  }
+
+  return Component.create(element, options)
 }
 
-},{"./Component":7,"./hook":11,"./registry":13}],9:[function(require,module,exports){
+},{"./Component":7,"./hook":11}],9:[function(require,module,exports){
 /**
  * Registers an event listener on an element
  * and returns a delegator.
@@ -612,6 +627,7 @@ var COMPONENT_ATTRIBUTE = "data-component"
 
 var hook = module.exports = {}
 
+hook.setHookAttribute = setHookAttribute
 hook.createComponentSelector = createComponentSelector
 hook.findComponent = findComponent
 hook.findAllComponent = findAllComponent
@@ -622,10 +638,14 @@ hook.getSubComponentName = getSubComponentName
 hook.assignSubComponents = assignSubComponents
 hook.filter = filter
 
-function createComponentSelector (name) {
-  return name
-      ? '[' + COMPONENT_ATTRIBUTE + '="' + name + '"]'
-      : '[' + COMPONENT_ATTRIBUTE + ']'
+function setHookAttribute (hook) {
+  COMPONENT_ATTRIBUTE = hook
+}
+
+function createComponentSelector (name, operator) {
+  name = name && '"' + name + '"'
+  operator = name ? operator || "=" : ""
+  return '[' + COMPONENT_ATTRIBUTE + operator + name + ']'
 }
 
 function findComponent (name, root) {
@@ -633,12 +653,12 @@ function findComponent (name, root) {
 }
 
 function findAllComponent (name, root) {
-  return (root || document).querySelectorAll(createComponentSelector(name))
+  return [].slice.call((root || document).querySelectorAll(createComponentSelector(name)))
 }
 
 function findSubComponents (name, root) {
-  name = camelcase(name)
-  return filter((root || document).querySelectorAll(createComponentSelector()), function (element, componentName, mainComponentName, subComponentName) {
+  var elements = (root || document).querySelectorAll(createComponentSelector(name, "^="))
+  return filter(elements, function (element, componentName, mainComponentName, subComponentName) {
     return subComponentName && name === mainComponentName
   })
 }
@@ -652,22 +672,24 @@ function getComponentName (element, cc) {
 function getMainComponentName (element, cc) {
   cc = cc == undefined || cc
   var value = getComponentName(element, false).split(":")
-  return cc ? camelcase(value[0]) : value[0]
+  value = value[0] || ""
+  return cc && value ? camelcase(value) : value
 }
 
 function getSubComponentName (element, cc) {
   cc = cc == undefined || cc
   var value = getComponentName(element, false).split(":")
-  return cc ? camelcase(value[1]) : value[1]
+  value = value[1] || ""
+  return cc && value ? camelcase(value) : value
 }
 
-function assignSubComponents (obj, rootComponentName, root, transform) {
-  return findSubComponents(rootComponentName, root).reduce(function (obj, element) {
+function assignSubComponents (obj, subComponents, transform) {
+  return subComponents.reduce(function (obj, element) {
     var name = getSubComponentName(element)
     if (name) {
       element = transform
-          ? transform(element, name)
-          : element
+        ? transform(element, name)
+        : element
       if (Array.isArray(obj[name])) {
         obj[name].push(element)
       }
@@ -701,20 +723,31 @@ var registry = require("./registry")
 var Component = require("./Component")
 
 module.exports = function register (name, mixin, ComponentConstructor) {
-  // main constructor is always last argument
-  ComponentConstructor = [].slice.call(arguments, -1)[0]
-  // functions in-between are mixin
-  mixin = [].slice.call(arguments, 1, -1)
+  if (!ComponentConstructor) {
+    ComponentConstructor = mixin
+    mixin = []
+  }
+  else {
+    // functions in-between are mixin
+    mixin = [].slice.call(arguments, 1, -1)
+    // main constructor is always last argument
+    ComponentConstructor = [].slice.call(arguments, -1)[0]
+  }
 
-  function CustomComponent (options, rootComponentName, root) {
+  if (!ComponentConstructor) {
+    ComponentConstructor = function () {}
+  }
+
+  function CustomComponent (element, options) {
     if (!(this instanceof CustomComponent)) {
-      return new CustomComponent(options, rootComponentName, root)
+      return new CustomComponent(element, options)
     }
 
-    rootComponentName = rootComponentName || name
     var instance = this
     instance.perform("create", instance, function () {
-      Component.call(instance, rootComponentName, root)
+      Component.call(instance, element, options)
+      // at this point custom constructors can already access the element
+      // so they only receive the options object for convenience
       ComponentConstructor.call(instance, options)
     })
   }
@@ -752,6 +785,7 @@ module.exports = function extend( obj, extension ){
   }
   return obj
 }
+
 },{}],15:[function(require,module,exports){
 var extend = require("./extend")
 

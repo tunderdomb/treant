@@ -2,20 +2,31 @@ var registry = require("./registry")
 var Component = require("./Component")
 
 module.exports = function register (name, mixin, ComponentConstructor) {
-  // main constructor is always last argument
-  ComponentConstructor = [].slice.call(arguments, -1)[0]
-  // functions in-between are mixin
-  mixin = [].slice.call(arguments, 1, -1)
+  if (!ComponentConstructor) {
+    ComponentConstructor = mixin
+    mixin = []
+  }
+  else {
+    // functions in-between are mixin
+    mixin = [].slice.call(arguments, 1, -1)
+    // main constructor is always last argument
+    ComponentConstructor = [].slice.call(arguments, -1)[0]
+  }
 
-  function CustomComponent (options, rootComponentName, root) {
+  if (!ComponentConstructor) {
+    ComponentConstructor = function () {}
+  }
+
+  function CustomComponent (element, options) {
     if (!(this instanceof CustomComponent)) {
-      return new CustomComponent(options, rootComponentName, root)
+      return new CustomComponent(element, options)
     }
 
-    rootComponentName = rootComponentName || name
     var instance = this
     instance.perform("create", instance, function () {
-      Component.call(instance, rootComponentName, root)
+      Component.call(instance, element, options)
+      // at this point custom constructors can already access the element
+      // so they only receive the options object for convenience
       ComponentConstructor.call(instance, options)
     })
   }

@@ -3,6 +3,7 @@ var COMPONENT_ATTRIBUTE = "data-component"
 
 var hook = module.exports = {}
 
+hook.setHookAttribute = setHookAttribute
 hook.createComponentSelector = createComponentSelector
 hook.findComponent = findComponent
 hook.findAllComponent = findAllComponent
@@ -13,10 +14,14 @@ hook.getSubComponentName = getSubComponentName
 hook.assignSubComponents = assignSubComponents
 hook.filter = filter
 
-function createComponentSelector (name) {
-  return name
-      ? '[' + COMPONENT_ATTRIBUTE + '="' + name + '"]'
-      : '[' + COMPONENT_ATTRIBUTE + ']'
+function setHookAttribute (hook) {
+  COMPONENT_ATTRIBUTE = hook
+}
+
+function createComponentSelector (name, operator) {
+  name = name && '"' + name + '"'
+  operator = name ? operator || "=" : ""
+  return '[' + COMPONENT_ATTRIBUTE + operator + name + ']'
 }
 
 function findComponent (name, root) {
@@ -24,12 +29,12 @@ function findComponent (name, root) {
 }
 
 function findAllComponent (name, root) {
-  return (root || document).querySelectorAll(createComponentSelector(name))
+  return [].slice.call((root || document).querySelectorAll(createComponentSelector(name)))
 }
 
 function findSubComponents (name, root) {
-  name = camelcase(name)
-  return filter((root || document).querySelectorAll(createComponentSelector()), function (element, componentName, mainComponentName, subComponentName) {
+  var elements = (root || document).querySelectorAll(createComponentSelector(name, "^="))
+  return filter(elements, function (element, componentName, mainComponentName, subComponentName) {
     return subComponentName && name === mainComponentName
   })
 }
@@ -43,22 +48,24 @@ function getComponentName (element, cc) {
 function getMainComponentName (element, cc) {
   cc = cc == undefined || cc
   var value = getComponentName(element, false).split(":")
-  return cc ? camelcase(value[0]) : value[0]
+  value = value[0] || ""
+  return cc && value ? camelcase(value) : value
 }
 
 function getSubComponentName (element, cc) {
   cc = cc == undefined || cc
   var value = getComponentName(element, false).split(":")
-  return cc ? camelcase(value[1]) : value[1]
+  value = value[1] || ""
+  return cc && value ? camelcase(value) : value
 }
 
-function assignSubComponents (obj, rootComponentName, root, transform) {
-  return findSubComponents(rootComponentName, root).reduce(function (obj, element) {
+function assignSubComponents (obj, subComponents, transform) {
+  return subComponents.reduce(function (obj, element) {
     var name = getSubComponentName(element)
     if (name) {
       element = transform
-          ? transform(element, name)
-          : element
+        ? transform(element, name)
+        : element
       if (Array.isArray(obj[name])) {
         obj[name].push(element)
       }

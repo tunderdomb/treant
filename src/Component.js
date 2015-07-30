@@ -3,30 +3,36 @@ var hook = require("./hook")
 var registry = require("./registry")
 var delegate = require("./delegate")
 
-registry.set("*", Component)
-
 module.exports = Component
 
-function Component (rootComponentName, root) {
+function Component (element, options) {
   if (!(this instanceof Component)) {
-    return new Component(rootComponentName, root)
+    return new Component(element, options)
   }
 
-  this.element = null
+  this.element = element || null
   this.components = {}
 
-  if (typeof rootComponentName == "string") {
-    this.element = hook.findComponent(rootComponentName, root)
-  }
-  else if (rootComponentName instanceof Element) {
-    this.element = rootComponentName
-    rootComponentName = this.getMainComponentValue()
-  }
-
-  if (rootComponentName && this.element && this.autoAssign) {
+  if (this.element && this.autoAssign) {
     this.assignSubComponents()
   }
 }
+
+Component.create = function (element, options) {
+  var name = hook.getComponentName(element, false)
+  var ComponentConstructor = null
+
+  if (registry.exists(name)) {
+    ComponentConstructor =  registry.get(name)
+  }
+  else {
+    console.warn("Missing custom component '%s' for ", name, element)
+    ComponentConstructor = registry.get("*") || Component
+  }
+
+  return new ComponentConstructor(element, options)
+}
+
 Component.prototype = {
   autoAssign: true,
 
@@ -45,32 +51,29 @@ Component.prototype = {
   findSubComponents: function (name) {
     return hook.findSubComponents(name, this.element)
   },
-  getComponentValue: function (cc) {
+  getComponentName: function (cc) {
     return hook.getComponentName(this.element, cc)
   },
-  getMainComponentValue: function (cc) {
+  getMainComponentName: function (cc) {
     return hook.getMainComponentName(this.element, cc)
   },
-  getSubComponentValue: function (cc) {
+  getSubComponentName: function (cc) {
     return hook.getSubComponentName(this.element, cc)
+  },
+  clearSubComponents: function () {
+    this.components = {}
   },
   assignSubComponents: function (transform) {
     var hostComponent = this
+    var subComponents = hook.findSubComponents(hostComponent.getMainComponentName(false), hostComponent.element)
+
+    if (!subComponents.length) {
+      return
+    }
 
     hostComponent.perform("assignSubComponents", hostComponent, function () {
-      hook.assignSubComponents(hostComponent.components, hostComponent.getMainComponentValue(), this.element, transform || function (element, name) {
-        var CustomComponent = registry.exists(name)
-            ? registry.get(name)
-            : registry.get("*") === Component
-              ? null // not a custom component
-              : registry.get("*")
-
-        element = CustomComponent
-          // instantiate custom components with host as first argument
-            ? new CustomComponent(hostComponent, element)
-            : new Component(element)
-
-        return element
+      hook.assignSubComponents(hostComponent.components, subComponents, transform || function (element, name) {
+        return Component.create(element, hostComponent)
       })
     })
   }

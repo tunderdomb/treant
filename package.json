@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-b": "browserify index.js --standalone treant -o build/treant.js",
-    "build": "npm run build-b"
+    "build-b-debug": "browserify index.js --standalone treant --debug -o build/treant.debug.js",
+    "build": "npm run build-b && npm run build-b-debug"
   },
   "keywords": [
     "A",
@@ -24,6 +25,8 @@
     "understudy": "^4.0.0"
   },
   "devDependencies": {
-    "browserify": "^11.0.0"
+    "browserify": "^11.0.0",
+    "chai": "^3.2.0",
+    "mocha": "2.2.5"
   }
 }

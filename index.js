@@ -1,4 +1,4 @@
-var registry = require("./src/registry")
+var hook = require("./src/hook")
 var register = require("./src/register")
 var component = require("./src/create")
 var Component = require("./src/Component")
@@ -13,6 +13,7 @@ treant.component = component
 treant.Component = Component
 treant.delegate = delegate
 treant.fragment = fragment
+treant.hook = hook
 
 var plugins = {}
 treant.plugins = plugins

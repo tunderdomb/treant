@@ -2,34 +2,46 @@
 <head>
     <meta charset="UTF-8">
     <title>treant test</title>
+    <link rel="stylesheet" href="../node_modules/mocha/mocha.css"/>
 </head>
 <body>
 
-<div data-component="pagination">
+<div id="mocha"></div>
+
+<div data-component="pagination" id="pagination">
     <a href="" data-component="pagination:page-number"></a>
 </div>
 
-<script type="text/javascript" src="../build/treant.js"></script>
+<div data-component="custom-pagination" id="pagination2">
+    <a href="" data-component="custom-pagination:page-number"></a>
+</div>
+
+<div id="scope">
+    <div data-component="pagination" id="pagination3">
+        <a href="" data-component="pagination:page-number"></a>
+    </div>
+</div>
+
+<div data-component="pagination" id="pagination4">
+    <a href="" data-component="pagination:page-number"></a>
+    <a href="" data-component="pagination:page-number"></a>
+    <a href="" data-component="pagination:page-number"></a>
+    <a href="" data-component="pagination:page-number"></a>
+</div>
+
+<div component="pagination" id="custom-attribute"></div>
+
+
+<script type="text/javascript" src="../build/treant.debug.js"></script>
+<script type="text/javascript" src="../node_modules/mocha/mocha.js"></script>
+<script type="text/javascript" src="../node_modules/chai/chai.js"></script>
+<!--<script type="text/javascript"></script>-->
 <script type="text/javascript">
-    !function () {
-        debugger
-
-        var Pagination = treant.register("pagination", plugin, function (options) {
-            debugger
-        })
-
-        function plugin (prototype) {
-            debugger
-            prototype.before("assignSubComponents", function (instance, next) {
-                debugger
-                instance.components.pageNumber = []
-                next()
-            })
-        }
-
-        var pagination = new Pagination({})
-        console.dir(pagination)
-    }()
+    mocha.setup("bdd")
+</script>
+<script type="text/javascript" src="index.js"></script>
+<script type="text/javascript">
+    mocha.run()
 </script>
 </body>
 </html>

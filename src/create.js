@@ -1,16 +1,27 @@
 var Component = require("./Component")
 var hook = require("./hook")
-var registry = require("./registry")
 
 module.exports = component
 
-function component (rootComponentName, root) {
-  if (typeof rootComponentName != "string") {
-    rootComponentName = hook.getMainComponentName(rootComponentName)
-  }
-  var ComponentConstructor = registry.exists(rootComponentName)
-    ? registry.get(rootComponentName)
-    : Component
+function component (name, root, options) {
+  var element = null
 
-  return new ComponentConstructor(rootComponentName, root)
+  // component("string")
+  if (typeof name == "string") {
+    // component("string"[, {}])
+    if (!(root instanceof Element)) {
+      options = root
+      root = null
+    }
+    // component("string", Element)
+    element = hook.findComponent(name, root)
+  }
+  // component(Element[, {}])
+  else if (name instanceof Element) {
+    element = name
+    options = root
+    root = null
+  }
+
+  return Component.create(element, options)
 }
