@@ -21,7 +21,7 @@ or use on of the scripts from the [`build`](/build) dir in the repo.
 
   - [Component](/docs/Component.md)
   - [Custom components](/docs/Custom components.md)
-  - [Internals](/docs/Sub components.md)
+  - [Internals](/docs/Internals.md)
   - [Sub components](/docs/Sub components.md)
 
 
