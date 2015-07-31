@@ -30,10 +30,10 @@ module.exports = function register (name, mixin, ComponentConstructor) {
     ComponentConstructor.call(instance, options)
   }
 
-  var internals = new Internals()
+  CustomComponent.prototype = Object.create(Component.prototype)
+  CustomComponent.prototype.constructor = CustomComponent
+  var internals = new Internals(CustomComponent.prototype)
   internals.autoAssign = true
-
-  CustomComponent.prototype = new Component()
   CustomComponent.prototype.internals = internals
   mixin.forEach(function (mixin) {
     mixin(CustomComponent.prototype)

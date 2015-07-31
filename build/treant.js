@@ -16,12 +16,6 @@ treant.delegate = delegate
 treant.fragment = fragment
 treant.hook = hook
 
-var plugins = {}
-treant.plugins = plugins
-
-plugins.attributes = require("./plugins/attributes")
-plugins.findBy = require("./plugins/findBy")
-
 var util = {}
 treant.util = util
 
@@ -29,7 +23,7 @@ util.extend = require("./util/extend")
 util.merge = require("./util/merge")
 util.object = require("./util/object")
 
-},{"./plugins/attributes":3,"./plugins/findBy":4,"./src/Component":5,"./src/create":7,"./src/delegate":8,"./src/fragment":9,"./src/hook":10,"./src/register":11,"./util/extend":13,"./util/merge":14,"./util/object":15}],2:[function(require,module,exports){
+},{"./src/Component":3,"./src/create":5,"./src/delegate":6,"./src/fragment":7,"./src/hook":8,"./src/register":9,"./util/extend":11,"./util/merge":12,"./util/object":13}],2:[function(require,module,exports){
 'use strict';
 module.exports = function (str) {
 	str = str.trim();
@@ -51,132 +45,6 @@ module.exports = function (str) {
 };
 
 },{}],3:[function(require,module,exports){
-var object = require("../util/object")
-
-module.exports = function () {
-  return function plugin (prototype) {
-
-    prototype.before("create", function () {
-      debugger
-    })
-
-    object.method(prototype, "defineAttribute", function (name, def) {
-      def = def || {}
-      var type
-      var parseValue
-      var stringifyValue
-      var shouldRemove
-      var getter
-      var setter
-
-      shouldRemove = function (value) {
-        return value === null
-      }
-
-      type = def.type
-      getter = def.get
-      setter = def.set
-
-      switch (type) {
-        case "boolean":
-          shouldRemove = function (value) {
-            return value === false
-          }
-          parseValue = function (value) {
-            return !!value
-          }
-          stringifyValue = function () {
-            return ""
-          }
-          break
-        case "number":
-          parseValue = function (value) {
-            return parseInt(value, 10)
-          }
-          break
-        case "float":
-          parseValue = function (value) {
-            return parseFloat(value)
-          }
-          break
-        case "string":
-        default:
-          stringifyValue = function (value) {
-            return value ? ""+value : ""
-          }
-      }
-
-      Object.defineProperty(prototype, name, {
-        get: getter || function () {
-          var value = this.element.getAttribute(name)
-          return parseValue ? parseValue(value) : value
-        },
-        set: setter || function (value) {
-          if (shouldRemove(value)) {
-            this.element.removeAttribute(name)
-          }
-          else {
-            value = stringifyValue ? stringifyValue(value) : stringifyValue
-            this.element.setAttribute(name, value)
-          }
-        }
-      })
-    })
-  }
-}
-
-},{"../util/object":15}],4:[function(require,module,exports){
-var object = require("../util/object")
-
-module.exports = function () {
-  return function plugin(prototype) {
-
-    function process( element, processor, result ){
-      switch( true ){
-        case typeof processor == "function":
-          return processor.call(element, result)
-        case processor == "array":
-          return [].slice.call(result)
-        default:
-          return result
-      }
-    }
-
-    object.method(prototype, "byClassName", function (className, processor) {
-      return process(this, processor, this.getElementsByClassName(className))
-    })
-
-    object.method(prototype, "byClassName", function( className, processor ){
-      return process(this, processor, this.getElementsByClassName(className))
-    })
-
-    object.method(prototype, "byTagName", function( tagName, processor ){
-      return process(this, processor, this.getElementsByTagName(tagName))
-    })
-
-    object.method(prototype, "byId", function( id, processor ){
-      return process(this, processor, this.getElementById(id))
-    })
-
-    object.method(prototype, "bySelector", function( selector, processor ){
-      return process(this, processor, this.querySelector(selector))
-    })
-
-    object.method(prototype, "bySelectorALl", function( selector, processor ){
-      return process(this, processor, this.querySelectorAll(selector))
-    })
-
-    object.method(prototype, "byAttribute", function( attribute, processor ){
-      return process(this, processor, this.querySelector('['+attribute+']'))
-    })
-
-    object.method(prototype, "byAttributeAll", function( attribute, processor ){
-      return process(this, processor, this.querySelectorAll('['+attribute+']'))
-    })
-  }
-}
-
-},{"../util/object":15}],5:[function(require,module,exports){
 var hook = require("./hook")
 var registry = require("./registry")
 var delegate = require("./delegate")
@@ -285,7 +153,7 @@ Component.prototype = {
   }
 }
 
-},{"./Internals":6,"./delegate":8,"./hook":10,"./registry":12}],6:[function(require,module,exports){
+},{"./Internals":4,"./delegate":6,"./hook":8,"./registry":10}],4:[function(require,module,exports){
 var merge = require("../util/merge")
 
 var defaultEventDefinition = {
@@ -297,11 +165,17 @@ var defaultEventDefinition = {
 
 module.exports = Internals
 
-function Internals () {
+function Internals (master) {
   this.autoAssign = true
   this.convertSubComponents = false
   this.components = {}
   this._events = {}
+
+  Object.defineProperty(this, "_master", {
+    get: function () {
+      return master
+    }
+  })
 }
 
 Internals.prototype.defineEvent = function (type, definition) {
@@ -314,7 +188,93 @@ Internals.prototype.getEventDefinition = function (type, detail) {
   return definition
 }
 
-},{"../util/merge":14}],7:[function(require,module,exports){
+Internals.prototype.defineAttribute = function (name, def) {
+  var master = this._master
+  if (!master) {
+    return
+  }
+
+  if (def == null) {
+    def = {}
+  }
+
+  var typeOfDef = typeof def
+  var type
+  var defaultValue
+  var getter
+  var setter
+
+  switch (typeOfDef) {
+    case "boolean":
+    case "number":
+    case "string":
+      // the definition is a primitive value
+      type = typeOfDef
+      defaultValue = def
+      break
+    case "object":
+    default:
+      // or a definition object
+      defaultValue = typeof def["default"] == "undefined" ? null : def["default"]
+      if (typeof def["type"] == "undefined") {
+        if (defaultValue == null) {
+          type = "string"
+        }
+        else {
+          type = typeof defaultValue
+        }
+      }
+      else {
+        type = def["type"]
+      }
+      getter = def["get"]
+      setter = def["set"]
+  }
+
+  var parseValue
+  var stringifyValue
+  var shouldRemove
+
+  shouldRemove = function (value) { return value == null }
+
+  switch (type) {
+    case "boolean":
+      shouldRemove = function (value) { return value === false }
+      parseValue = function (value) { return value != null }
+      stringifyValue = function (value) { return "" }
+      break
+    case "number":
+      parseValue = function (value) { return parseInt(value, 10) }
+      break
+    case "float":
+      parseValue = function (value) { return parseFloat(value) }
+      break
+    case "string":
+    default:
+      stringifyValue = function (value) { return value ? ""+value : "" }
+  }
+
+  Object.defineProperty(master, name, {
+    get: getter || function () {
+      var value = this.element.getAttribute(name)
+      if (value == null) {
+        return defaultValue
+      }
+      return parseValue ? parseValue(value) : value
+    },
+    set: setter || function (value) {
+      if (shouldRemove(value)) {
+        this.element.removeAttribute(name)
+      }
+      else {
+        value = stringifyValue ? stringifyValue(value) : stringifyValue
+        this.element.setAttribute(name, value)
+      }
+    }
+  })
+}
+
+},{"../util/merge":12}],5:[function(require,module,exports){
 var Component = require("./Component")
 var hook = require("./hook")
 
@@ -343,7 +303,7 @@ function component (name, root, options) {
   return Component.create(element, options)
 }
 
-},{"./Component":5,"./hook":10}],8:[function(require,module,exports){
+},{"./Component":3,"./hook":8}],6:[function(require,module,exports){
 /**
  * Registers an event listener on an element
  * and returns a delegator.
@@ -466,7 +426,7 @@ function findParent( selector, el, e ){
     return null
 }
 
-},{}],9:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 var merge = require("../util/merge")
 
 module.exports = fragment
@@ -507,7 +467,7 @@ fragment.render = function( html, templateData ){
   return fragment(html)(templateData)
 }
 
-},{"../util/merge":14}],10:[function(require,module,exports){
+},{"../util/merge":12}],8:[function(require,module,exports){
 var camelcase = require("camelcase")
 var COMPONENT_ATTRIBUTE = "data-component"
 
@@ -609,7 +569,7 @@ function filter (elements, filter) {
   }
 }
 
-},{"camelcase":2}],11:[function(require,module,exports){
+},{"camelcase":2}],9:[function(require,module,exports){
 var registry = require("./registry")
 var Component = require("./Component")
 var Internals = require("./Internals")
@@ -642,10 +602,10 @@ module.exports = function register (name, mixin, ComponentConstructor) {
     ComponentConstructor.call(instance, options)
   }
 
-  var internals = new Internals()
+  CustomComponent.prototype = Object.create(Component.prototype)
+  CustomComponent.prototype.constructor = CustomComponent
+  var internals = new Internals(CustomComponent.prototype)
   internals.autoAssign = true
-
-  CustomComponent.prototype = new Component()
   CustomComponent.prototype.internals = internals
   mixin.forEach(function (mixin) {
     mixin(CustomComponent.prototype)
@@ -655,7 +615,7 @@ module.exports = function register (name, mixin, ComponentConstructor) {
   // define main prototype after registering
 }
 
-},{"./Component":5,"./Internals":6,"./registry":12}],12:[function(require,module,exports){
+},{"./Component":3,"./Internals":4,"./registry":10}],10:[function(require,module,exports){
 var registry = module.exports = {}
 
 var components = {}
@@ -672,7 +632,7 @@ registry.set = function exists (name, ComponentConstructor) {
   return components[name] = ComponentConstructor
 }
 
-},{}],13:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 module.exports = function extend( obj, extension ){
   for( var name in extension ){
     if( extension.hasOwnProperty(name) ) obj[name] = extension[name]
@@ -680,14 +640,14 @@ module.exports = function extend( obj, extension ){
   return obj
 }
 
-},{}],14:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 var extend = require("./extend")
 
 module.exports = function( obj, extension ){
   return extension(extend({}, obj), extension)
 }
 
-},{"./extend":13}],15:[function(require,module,exports){
+},{"./extend":11}],13:[function(require,module,exports){
 var object = module.exports = {}
 
 object.defineGetter = function (obj, name, fn) {

@@ -15,12 +15,6 @@ treant.delegate = delegate
 treant.fragment = fragment
 treant.hook = hook
 
-var plugins = {}
-treant.plugins = plugins
-
-plugins.attributes = require("./plugins/attributes")
-plugins.findBy = require("./plugins/findBy")
-
 var util = {}
 treant.util = util
 

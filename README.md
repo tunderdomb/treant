@@ -36,7 +36,6 @@ treant.fragment()
 
 treant.hook.<...>
 
-treant.plugins.attributes()
 treant.plugins.findBy()
 
 treant.util.extend()
