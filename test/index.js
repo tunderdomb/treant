@@ -43,18 +43,24 @@ describe("Component()", function () {
       var component = treant.component("custom-pagination")
       assert.isDefined(component.components.pageNumber)
     })
+    // component.components.<Element>
+    it("should assign native dom elements for sub components", function () {
+      var component = treant.component(pagination)
+      assert.instanceOf(component.components.pageNumber, Element)
+    })
     // component.components.<Component>
     it("should create Component instances for sub components", function () {
+      function plugin (prototype) {
+        prototype.internals.convertSubComponents = true
+      }
+      treant.register("pagination", plugin, function (options) {})
       var component = treant.component(pagination)
       assert.instanceOf(component.components.pageNumber, treant.Component)
     })
     // component.components.[<subComponent>]
     it("should assign sub component arrays if defined", function () {
       function plugin (prototype) {
-        prototype.before("assignSubComponents", function (instance, next) {
-          instance.components.pageNumber = []
-          next()
-        })
+        prototype.internals.components.pageNumber = []
       }
       treant.register("pagination", plugin, function (options) {})
       var component = treant.component(pagination4, {})
@@ -66,7 +72,7 @@ describe("Component()", function () {
   describe("prototype.assignSubComponents()", function () {
     it("should not run if autoAssign is disabled", function () {
       function plugin (prototype) {
-        prototype.autoAssign = false
+        prototype.internals.autoAssign = false
       }
       treant.register("pagination", plugin, function (options) {})
       var component = treant.component(pagination)

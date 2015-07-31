@@ -59,14 +59,19 @@ function getSubComponentName (element, cc) {
   return cc && value ? camelcase(value) : value
 }
 
-function assignSubComponents (obj, subComponents, transform) {
+function assignSubComponents (obj, subComponents, transform, assign) {
   return subComponents.reduce(function (obj, element) {
     var name = getSubComponentName(element)
     if (name) {
-      element = transform
+
+      element = typeof transform == "function"
         ? transform(element, name)
         : element
-      if (Array.isArray(obj[name])) {
+
+      if (typeof assign == "function") {
+        assign(obj, name, element)
+      }
+      else if (Array.isArray(obj[name])) {
         obj[name].push(element)
       }
       else {

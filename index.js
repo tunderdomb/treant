@@ -19,7 +19,6 @@ var plugins = {}
 treant.plugins = plugins
 
 plugins.attributes = require("./plugins/attributes")
-plugins.dispatcher = require("./plugins/dispatcher")
 plugins.findBy = require("./plugins/findBy")
 
 var util = {}

@@ -20,7 +20,6 @@ var plugins = {}
 treant.plugins = plugins
 
 plugins.attributes = require("./plugins/attributes")
-plugins.dispatcher = require("./plugins/dispatcher")
 plugins.findBy = require("./plugins/findBy")
 
 var util = {}
@@ -30,7 +29,7 @@ util.extend = require("./util/extend")
 util.merge = require("./util/merge")
 util.object = require("./util/object")
 
-},{"./plugins/attributes":4,"./plugins/dispatcher":5,"./plugins/findBy":6,"./src/Component":7,"./src/create":8,"./src/delegate":9,"./src/fragment":10,"./src/hook":11,"./src/register":12,"./util/extend":14,"./util/merge":15,"./util/object":16}],2:[function(require,module,exports){
+},{"./plugins/attributes":3,"./plugins/findBy":4,"./src/Component":5,"./src/create":7,"./src/delegate":8,"./src/fragment":9,"./src/hook":10,"./src/register":11,"./util/extend":13,"./util/merge":14,"./util/object":15}],2:[function(require,module,exports){
 'use strict';
 module.exports = function (str) {
 	str = str.trim();
@@ -52,146 +51,6 @@ module.exports = function (str) {
 };
 
 },{}],3:[function(require,module,exports){
-/*
- * index.js: Simple pattern for deferable events, when you want an action to be interruptable
- *
- * action - string
- * args... - anything
- * performFn - once all "before" deferences are done call this function,
- *             then call all "after" deferences.
- * onFinish - once all "after" deferences are done call this function.
- *
- */
-module.exports = Understudy;
-module.exports.Understudy = Understudy;
-
-function Understudy() {
-  this.perform = perform;
-  this.after = registrar('_after_interceptors');
-  this.before = registrar('_before_interceptors');
-  this._before_interceptors = null;
-  this._after_interceptors = null;
-  return this;
-}
-
-function registrar(property) {
-  return function (action, callback) {
-    if (typeof action === 'string') {
-      if (typeof callback === 'function') {
-        this[property] || (this[property] = {});
-        this[property][action] || (this[property][action] = []);
-        var interceptors = this[property][action];
-        interceptors[interceptors.length] = callback;
-        return this;
-      }
-      else {
-        throw new Error('callback must be a function');
-      }
-    }
-    throw new Error('event must be a string');
-  }
-}
-
-function perform(action /* , args..., performFn, callback*/) {
-  if (typeof action !== 'string') throw new Error('event must be a string');
-  var callback = arguments[arguments.length - 1];
-  var performFn = arguments[arguments.length - 2];
-  var slice = -2;
-  if (typeof performFn !== 'function') {
-    if (typeof callback !== 'function') {
-      throw new Error('performFn and callback must be a function');
-    }
-
-    performFn = callback;
-    callback = null;
-    slice = -1;
-  }
-
-  //
-  // Get "arguments" Array and set first to null to indicate
-  // to nextInterceptor that there is no error.
-  //
-  var args = Array.prototype.slice.call(arguments, 0, slice);
-  args[0] = null;
-
-  //
-  // This is called in multiple temporal localities, put into a function instead of inline
-  // minor speed loss for more maintainability
-  //
-  function iterate(self, interceptors, args, after) {
-    if (!interceptors) {
-      after.apply(self, args);
-      return;
-    }
-
-    interceptors = interceptors.concat();
-    var i = 0;
-    var len = interceptors.length;
-    if (!len) {
-      after.apply(self, args);
-      return;
-    }
-
-    function nextInterceptor() {
-      if (i === len) {
-        i++;
-        after.apply(self, arguments);
-      }
-      else if (i < len) {
-        var used = false;
-        var interceptor = interceptors[i++];
-        interceptor.apply(self, Array.prototype.slice.call(arguments, 1).concat(function next(err) {
-          //
-          // Do not allow multiple continuations
-          //
-          if (used) { return; }
-
-          used = true;
-          if (!err || !callback) {
-            nextInterceptor.apply(null, args);
-          } else {
-            after.call(self, err);
-          }
-        }));
-      }
-    }
-    nextInterceptor.apply(null, args);
-  }
-
-  //
-  // Remark (jcrugzz): Is this the most optimized way to do this?
-  //
-  function executePerform(err) {
-    var self = this;
-    if (err && callback) {
-      callback.call(this, err);
-    } else {
-      //
-      // Remark (indexzero): Should we console.warn if `arguments.length > 1` here?
-      //
-      performFn.call(this, function afterPerform(err) {
-        var performArgs;
-        if (err && callback) {
-          callback.call(self, err);
-        } else {
-          performArgs = Array.prototype.slice.call(arguments);
-          iterate(self, self._after_interceptors && self._after_interceptors[action], args, function (err) {
-            if (err && callback) {
-              callback.call(self, err);
-            } else if (callback) {
-              callback.apply(self, performArgs);
-            }
-          });
-        }
-      })
-    }
-  }
-
-  iterate(this, this._before_interceptors && this._before_interceptors[action], args, executePerform);
-  return this;
-}
-
-},{}],4:[function(require,module,exports){
 var object = require("../util/object")
 
 module.exports = function () {
@@ -266,34 +125,7 @@ module.exports = function () {
   }
 }
 
-},{"../util/object":16}],5:[function(require,module,exports){
-var object = require("../util/object")
-var merge = require("../util/merge")
-
-var defaultDefinition = {
-  detail: null,
-  view: window,
-  bubbles: true,
-  cancelable: true
-}
-
-module.exports = function (eventDefinitions) {
-  return function plugin(prototype) {
-    var definitions = eventDefinitions || {}
-
-    object.method(prototype, "defineEvent", function (type, definition) {
-      definitions[type] = definition
-    })
-
-    object.method(prototype, "dispatch", function (type, detail) {
-      var definition = merge(defaultDefinition, definitions[type])
-      definition.detail = detail || definition.detail
-      return this.dispatchEvent(new window.CustomEvent(type, definition))
-    })
-  }
-}
-
-},{"../util/merge":15,"../util/object":16}],6:[function(require,module,exports){
+},{"../util/object":15}],4:[function(require,module,exports){
 var object = require("../util/object")
 
 module.exports = function () {
@@ -344,11 +176,11 @@ module.exports = function () {
   }
 }
 
-},{"../util/object":16}],7:[function(require,module,exports){
-var understudy = require("understudy")
+},{"../util/object":15}],5:[function(require,module,exports){
 var hook = require("./hook")
 var registry = require("./registry")
 var delegate = require("./delegate")
+var Internals = require("./Internals")
 
 module.exports = Component
 
@@ -360,33 +192,48 @@ function Component (element, options) {
   this.element = element || null
   this.components = {}
 
-  if (this.element && this.autoAssign) {
+  if (this.element && this.internals.autoAssign) {
     this.assignSubComponents()
   }
 }
 
 Component.create = function (element, options) {
   var name = hook.getComponentName(element, false)
+
+  if (!name) {
+    console.warn("Unable to create component, this element doesn't have a component attribute", element)
+    return null
+  }
+
   var ComponentConstructor = null
 
   if (registry.exists(name)) {
     ComponentConstructor =  registry.get(name)
   }
+  else if (registry.exists("*")) {
+    ComponentConstructor = registry.get("*")
+  }
   else {
-    console.warn("Missing custom component '%s' for ", name, element)
-    ComponentConstructor = registry.get("*") || Component
+    console.warn("Missing custom component '%s' for ", name, element,
+        ' Use the Component constructor to create raw components or register a "*" component.')
+    ComponentConstructor = Component
   }
 
   return new ComponentConstructor(element, options)
 }
 
 Component.prototype = {
-  autoAssign: true,
+  internals: new Internals(),
 
   delegate: function (options) {
     options.element = this.element
     options.context = options.context || this
     return delegate(options)
+  },
+
+  dispatch: function (type, detail) {
+    var definition = this.internals.getEventDefinition(type, detail)
+    return this.dispatchEvent(new window.CustomEvent(type, definition))
   },
 
   findComponent: function (name) {
@@ -412,23 +259,62 @@ Component.prototype = {
   },
   assignSubComponents: function (transform) {
     var hostComponent = this
-    var subComponents = hook.findSubComponents(hostComponent.getMainComponentName(false), hostComponent.element)
+    var subComponents = hook.findSubComponents(this.getMainComponentName(false), this.element)
 
     if (!subComponents.length) {
       return
     }
 
-    hostComponent.perform("assignSubComponents", hostComponent, function () {
-      hook.assignSubComponents(hostComponent.components, subComponents, transform || function (element, name) {
+    if (this.internals.convertSubComponents && (typeof transform == "undefined" || transform === true)) {
+      transform = function (element/*, name*/) {
         return Component.create(element, hostComponent)
-      })
+      }
+    }
+
+    var internals = this.internals
+
+    hook.assignSubComponents(this.components, subComponents, transform, function (components, name, element) {
+      if (Array.isArray(internals.components[name])) {
+        components[name] = components[name] || []
+        components[name].push(element)
+      }
+      else {
+        components[name] = element
+      }
     })
   }
 }
 
-understudy.call(Component.prototype)
+},{"./Internals":6,"./delegate":8,"./hook":10,"./registry":12}],6:[function(require,module,exports){
+var merge = require("../util/merge")
 
-},{"./delegate":9,"./hook":11,"./registry":13,"understudy":3}],8:[function(require,module,exports){
+var defaultEventDefinition = {
+  detail: null,
+  view: window,
+  bubbles: true,
+  cancelable: true
+}
+
+module.exports = Internals
+
+function Internals () {
+  this.autoAssign = true
+  this.convertSubComponents = false
+  this.components = {}
+  this._events = {}
+}
+
+Internals.prototype.defineEvent = function (type, definition) {
+  this._events[type] = definition
+}
+
+Internals.prototype.getEventDefinition = function (type, detail) {
+  var definition = merge(defaultEventDefinition, this._events[type])
+  definition.detail = typeof detail == "undefined" ? definition.detail : detail
+  return definition
+}
+
+},{"../util/merge":14}],7:[function(require,module,exports){
 var Component = require("./Component")
 var hook = require("./hook")
 
@@ -457,7 +343,7 @@ function component (name, root, options) {
   return Component.create(element, options)
 }
 
-},{"./Component":7,"./hook":11}],9:[function(require,module,exports){
+},{"./Component":5,"./hook":10}],8:[function(require,module,exports){
 /**
  * Registers an event listener on an element
  * and returns a delegator.
@@ -580,7 +466,7 @@ function findParent( selector, el, e ){
     return null
 }
 
-},{}],10:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 var merge = require("../util/merge")
 
 module.exports = fragment
@@ -621,7 +507,7 @@ fragment.render = function( html, templateData ){
   return fragment(html)(templateData)
 }
 
-},{"../util/merge":15}],11:[function(require,module,exports){
+},{"../util/merge":14}],10:[function(require,module,exports){
 var camelcase = require("camelcase")
 var COMPONENT_ATTRIBUTE = "data-component"
 
@@ -683,14 +569,19 @@ function getSubComponentName (element, cc) {
   return cc && value ? camelcase(value) : value
 }
 
-function assignSubComponents (obj, subComponents, transform) {
+function assignSubComponents (obj, subComponents, transform, assign) {
   return subComponents.reduce(function (obj, element) {
     var name = getSubComponentName(element)
     if (name) {
-      element = transform
+
+      element = typeof transform == "function"
         ? transform(element, name)
         : element
-      if (Array.isArray(obj[name])) {
+
+      if (typeof assign == "function") {
+        assign(obj, name, element)
+      }
+      else if (Array.isArray(obj[name])) {
         obj[name].push(element)
       }
       else {
@@ -718,9 +609,10 @@ function filter (elements, filter) {
   }
 }
 
-},{"camelcase":2}],12:[function(require,module,exports){
+},{"camelcase":2}],11:[function(require,module,exports){
 var registry = require("./registry")
 var Component = require("./Component")
+var Internals = require("./Internals")
 
 module.exports = function register (name, mixin, ComponentConstructor) {
   if (!ComponentConstructor) {
@@ -742,17 +634,19 @@ module.exports = function register (name, mixin, ComponentConstructor) {
     if (!(this instanceof CustomComponent)) {
       return new CustomComponent(element, options)
     }
-
     var instance = this
-    instance.perform("create", instance, function () {
-      Component.call(instance, element, options)
-      // at this point custom constructors can already access the element
-      // so they only receive the options object for convenience
-      ComponentConstructor.call(instance, options)
-    })
+
+    Component.call(instance, element, options)
+    // at this point custom constructors can already access the element and sub components
+    // so they only receive the options object for convenience
+    ComponentConstructor.call(instance, options)
   }
 
+  var internals = new Internals()
+  internals.autoAssign = true
+
   CustomComponent.prototype = new Component()
+  CustomComponent.prototype.internals = internals
   mixin.forEach(function (mixin) {
     mixin(CustomComponent.prototype)
   })
@@ -761,7 +655,7 @@ module.exports = function register (name, mixin, ComponentConstructor) {
   // define main prototype after registering
 }
 
-},{"./Component":7,"./registry":13}],13:[function(require,module,exports){
+},{"./Component":5,"./Internals":6,"./registry":12}],12:[function(require,module,exports){
 var registry = module.exports = {}
 
 var components = {}
@@ -778,7 +672,7 @@ registry.set = function exists (name, ComponentConstructor) {
   return components[name] = ComponentConstructor
 }
 
-},{}],14:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 module.exports = function extend( obj, extension ){
   for( var name in extension ){
     if( extension.hasOwnProperty(name) ) obj[name] = extension[name]
@@ -786,14 +680,14 @@ module.exports = function extend( obj, extension ){
   return obj
 }
 
-},{}],15:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 var extend = require("./extend")
 
 module.exports = function( obj, extension ){
   return extension(extend({}, obj), extension)
 }
 
-},{"./extend":14}],16:[function(require,module,exports){
+},{"./extend":13}],15:[function(require,module,exports){
 var object = module.exports = {}
 
 object.defineGetter = function (obj, name, fn) {

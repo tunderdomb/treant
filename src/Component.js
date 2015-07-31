@@ -1,7 +1,7 @@
-var understudy = require("understudy")
 var hook = require("./hook")
 var registry = require("./registry")
 var delegate = require("./delegate")
+var Internals = require("./Internals")
 
 module.exports = Component
 
@@ -13,33 +13,48 @@ function Component (element, options) {
   this.element = element || null
   this.components = {}
 
-  if (this.element && this.autoAssign) {
+  if (this.element && this.internals.autoAssign) {
     this.assignSubComponents()
   }
 }
 
 Component.create = function (element, options) {
   var name = hook.getComponentName(element, false)
+
+  if (!name) {
+    console.warn("Unable to create component, this element doesn't have a component attribute", element)
+    return null
+  }
+
   var ComponentConstructor = null
 
   if (registry.exists(name)) {
     ComponentConstructor =  registry.get(name)
   }
+  else if (registry.exists("*")) {
+    ComponentConstructor = registry.get("*")
+  }
   else {
-    console.warn("Missing custom component '%s' for ", name, element)
-    ComponentConstructor = registry.get("*") || Component
+    console.warn("Missing custom component '%s' for ", name, element,
+        ' Use the Component constructor to create raw components or register a "*" component.')
+    ComponentConstructor = Component
   }
 
   return new ComponentConstructor(element, options)
 }
 
 Component.prototype = {
-  autoAssign: true,
+  internals: new Internals(),
 
   delegate: function (options) {
     options.element = this.element
     options.context = options.context || this
     return delegate(options)
+  },
+
+  dispatch: function (type, detail) {
+    var definition = this.internals.getEventDefinition(type, detail)
+    return this.dispatchEvent(new window.CustomEvent(type, definition))
   },
 
   findComponent: function (name) {
@@ -65,18 +80,28 @@ Component.prototype = {
   },
   assignSubComponents: function (transform) {
     var hostComponent = this
-    var subComponents = hook.findSubComponents(hostComponent.getMainComponentName(false), hostComponent.element)
+    var subComponents = hook.findSubComponents(this.getMainComponentName(false), this.element)
 
     if (!subComponents.length) {
       return
     }
 
-    hostComponent.perform("assignSubComponents", hostComponent, function () {
-      hook.assignSubComponents(hostComponent.components, subComponents, transform || function (element, name) {
+    if (this.internals.convertSubComponents && (typeof transform == "undefined" || transform === true)) {
+      transform = function (element/*, name*/) {
         return Component.create(element, hostComponent)
-      })
+      }
+    }
+
+    var internals = this.internals
+
+    hook.assignSubComponents(this.components, subComponents, transform, function (components, name, element) {
+      if (Array.isArray(internals.components[name])) {
+        components[name] = components[name] || []
+        components[name].push(element)
+      }
+      else {
+        components[name] = element
+      }
     })
   }
 }
-
-understudy.call(Component.prototype)

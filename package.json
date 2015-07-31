@@ -21,8 +21,7 @@
   "author": "tunderdomb",
   "license": "MIT",
   "dependencies": {
-    "camelcase": "^1.1.0",
-    "understudy": "^4.0.0"
+    "camelcase": "^1.1.0"
   },
   "devDependencies": {
     "browserify": "^11.0.0",
