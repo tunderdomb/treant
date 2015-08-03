@@ -36,7 +36,7 @@ module.exports = function register (name, mixin, ComponentConstructor) {
   internals.autoAssign = true
   CustomComponent.prototype.internals = internals
   mixin.forEach(function (mixin) {
-    mixin(CustomComponent.prototype)
+    mixin.call(CustomComponent.prototype, CustomComponent.prototype)
   })
 
   return registry.set(name, CustomComponent)

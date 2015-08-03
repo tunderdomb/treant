@@ -266,7 +266,23 @@ describe("component()", function () {
     var component = treant.component(pagination)
     assert.instanceOf(component, treant.Component)
   })
+})
 
+describe("storage", function () {
+
+  it("should save and retrieve the component by element", function () {
+    var Pagination = treant.register("pagination", function () {})
+    var p = new Pagination(pagination)
+    treant.storage.save(p)
+    assert.equal(p, treant.storage.get(pagination))
+  })
+  it("should save and remove the component by element", function () {
+    var Pagination = treant.register("pagination", function () {})
+    var p = new Pagination(pagination2)
+    treant.storage.save(p)
+    treant.storage.remove(p)
+    assert.isUndefined(treant.storage.get(pagination2))
+  })
 })
 
 describe("Internals", function () {

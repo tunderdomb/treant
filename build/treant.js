@@ -2,6 +2,7 @@
 var hook = require("./src/hook")
 var register = require("./src/register")
 var component = require("./src/create")
+var storage = require("./src/storage")
 var Component = require("./src/Component")
 var delegate = require("./src/delegate")
 var fragment = require("./src/fragment")
@@ -11,6 +12,7 @@ module.exports = treant
 
 treant.register = register
 treant.component = component
+treant.storage = storage
 treant.Component = Component
 treant.delegate = delegate
 treant.fragment = fragment
@@ -23,7 +25,7 @@ util.extend = require("./util/extend")
 util.merge = require("./util/merge")
 util.object = require("./util/object")
 
-},{"./src/Component":3,"./src/create":5,"./src/delegate":6,"./src/fragment":7,"./src/hook":8,"./src/register":9,"./util/extend":11,"./util/merge":12,"./util/object":13}],2:[function(require,module,exports){
+},{"./src/Component":3,"./src/create":5,"./src/delegate":6,"./src/fragment":7,"./src/hook":8,"./src/register":9,"./src/storage":11,"./util/extend":12,"./util/merge":13,"./util/object":14}],2:[function(require,module,exports){
 'use strict';
 module.exports = function (str) {
 	str = str.trim();
@@ -274,7 +276,7 @@ Internals.prototype.defineAttribute = function (name, def) {
   })
 }
 
-},{"../util/merge":12}],5:[function(require,module,exports){
+},{"../util/merge":13}],5:[function(require,module,exports){
 var Component = require("./Component")
 var hook = require("./hook")
 
@@ -467,7 +469,7 @@ fragment.render = function( html, templateData ){
   return fragment(html)(templateData)
 }
 
-},{"../util/merge":12}],8:[function(require,module,exports){
+},{"../util/merge":13}],8:[function(require,module,exports){
 var camelcase = require("camelcase")
 var COMPONENT_ATTRIBUTE = "data-component"
 
@@ -608,7 +610,7 @@ module.exports = function register (name, mixin, ComponentConstructor) {
   internals.autoAssign = true
   CustomComponent.prototype.internals = internals
   mixin.forEach(function (mixin) {
-    mixin(CustomComponent.prototype)
+    mixin.call(CustomComponent.prototype, CustomComponent.prototype)
   })
 
   return registry.set(name, CustomComponent)
@@ -633,6 +635,32 @@ registry.set = function exists (name, ComponentConstructor) {
 }
 
 },{}],11:[function(require,module,exports){
+var storage = module.exports = {}
+var components = []
+var elements = []
+
+storage.get = function (element) {
+  return components[elements.indexOf(element)]
+}
+
+storage.save = function (component) {
+  components.push(component)
+  elements.push(component.element)
+}
+
+storage.remove = function (component) {
+  var i = component instanceof Element
+      ? elements.indexOf(component)
+      : components.indexOf(component)
+
+  if (~i) {
+    components.splice(i, 1)
+    elements.splice(i, 1)
+  }
+}
+
+
+},{}],12:[function(require,module,exports){
 module.exports = function extend( obj, extension ){
   for( var name in extension ){
     if( extension.hasOwnProperty(name) ) obj[name] = extension[name]
@@ -640,14 +668,14 @@ module.exports = function extend( obj, extension ){
   return obj
 }
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 var extend = require("./extend")
 
 module.exports = function( obj, extension ){
   return extension(extend({}, obj), extension)
 }
 
-},{"./extend":11}],13:[function(require,module,exports){
+},{"./extend":12}],14:[function(require,module,exports){
 var object = module.exports = {}
 
 object.defineGetter = function (obj, name, fn) {

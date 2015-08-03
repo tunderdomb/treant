@@ -1,6 +1,7 @@
 var hook = require("./src/hook")
 var register = require("./src/register")
 var component = require("./src/create")
+var storage = require("./src/storage")
 var Component = require("./src/Component")
 var delegate = require("./src/delegate")
 var fragment = require("./src/fragment")
@@ -10,6 +11,7 @@ module.exports = treant
 
 treant.register = register
 treant.component = component
+treant.storage = storage
 treant.Component = Component
 treant.delegate = delegate
 treant.fragment = fragment
