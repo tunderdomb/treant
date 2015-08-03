@@ -14,7 +14,7 @@ With browserify
 var treant = require("treant")
 ```
 
-or use on of the scripts from the [`build`](/build) dir in the repo.
+or use one of the scripts from the [`build`](/build) dir in the repo.
 
 
 ## Docs
