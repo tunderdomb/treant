@@ -98,6 +98,105 @@ describe("Component()", function () {
       assert.isUndefined(component.components.pageNumber)
     })
   })
+
+  describe("prototype.dispatch", function () {
+    it("should dispatch a custom event", function () {
+      var component = new treant.Component(pagination)
+      var dispatched = false
+      component.element.addEventListener("hello", function (e) {
+        dispatched = true
+      }, false)
+
+      component.dispatch("hello")
+
+      assert.isTrue(dispatched)
+    })
+    it("should dispatch a click event", function () {
+      var component = new treant.Component(pagination)
+      var dispatched = false
+      component.element.addEventListener("click", function (e) {
+        dispatched = true
+      }, false)
+
+      component.dispatch("click")
+
+      assert.isTrue(dispatched)
+    })
+    it("should carry data", function () {
+      var component = new treant.Component(pagination)
+      var data = {
+        hey: "ho"
+      }
+      var eventData = null
+      component.element.addEventListener("click", function (e) {
+        eventData = e.detail
+      }, false)
+
+      component.dispatch("click", data)
+
+      assert.equal(data, eventData)
+    })
+    it("should register an bubbling and non bubbling event definition", function () {
+      var Pagination = treant.register("pagination", proto, function () {})
+      function proto () {
+        this.internals.defineEvent("hey", {
+          bubbles: true
+        })
+        this.internals.defineEvent("ho", {
+          bubbles: false
+        })
+      }
+      var component = new Pagination(pagination)
+      var hey = false
+      var ho = false
+      document.body.addEventListener("hey", function (e) {
+        hey = true
+      }, false)
+      document.body.addEventListener("ho", function (e) {
+        ho = true
+      }, false)
+
+      component.dispatch("hey")
+      component.dispatch("ho")
+
+      assert.isTrue(hey)
+      assert.isFalse(ho)
+    })
+    it("should register a cancellable event definition", function () {
+      var Pagination = treant.register("pagination", proto, function () {})
+      function proto () {
+        this.internals.defineEvent("cancellable", {
+          cancelable: true,
+          bubbles: true
+        })
+        this.internals.defineEvent("notcancellable", {
+          cancelable: false,
+          bubbles: true
+        })
+      }
+      var component = new Pagination(pagination)
+      var cancellable = false
+      var notcancellable = false
+      component.element.addEventListener("cancellable", function (e) {
+        e.preventDefault()
+      }, false)
+      component.element.addEventListener("notcancellable", function (e) {
+        e.preventDefault()
+      }, false)
+      document.body.addEventListener("cancellable", function (e) {
+        cancellable = e.defaultPrevented
+      }, false)
+      document.body.addEventListener("notcancellable", function (e) {
+        notcancellable = e.defaultPrevented
+      }, false)
+
+      component.dispatch("cancellable")
+      component.dispatch("notcancellable")
+
+      assert.isTrue(cancellable)
+      assert.isFalse(notcancellable)
+    })
+  })
 })
 
 describe("CustomComponent", function () {

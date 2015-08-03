@@ -103,7 +103,7 @@ Component.prototype = {
 
   dispatch: function (type, detail) {
     var definition = this.internals.getEventDefinition(type, detail)
-    return this.dispatchEvent(new window.CustomEvent(type, definition))
+    return this.element.dispatchEvent(new window.CustomEvent(type, definition))
   },
 
   findComponent: function (name) {
@@ -672,7 +672,7 @@ module.exports = function extend( obj, extension ){
 var extend = require("./extend")
 
 module.exports = function( obj, extension ){
-  return extension(extend({}, obj), extension)
+  return extend(extend({}, obj), extension)
 }
 
 },{"./extend":12}],14:[function(require,module,exports){

@@ -54,7 +54,7 @@ Component.prototype = {
 
   dispatch: function (type, detail) {
     var definition = this.internals.getEventDefinition(type, detail)
-    return this.dispatchEvent(new window.CustomEvent(type, definition))
+    return this.element.dispatchEvent(new window.CustomEvent(type, definition))
   },
 
   findComponent: function (name) {
