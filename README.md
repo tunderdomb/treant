@@ -144,7 +144,7 @@ console.log(pagination.hey(), pagination.ho(), "let's ", pagination.lets)
       }
     }
     treant.register("text-input", inputBase, function(){})
-    treant.register("number-input", numberInputBase, function(){})
+    treant.register("number-input", inputBase, numberInputBase, function(){})
     ```
 
   - You can override what attribute is used for the hook
