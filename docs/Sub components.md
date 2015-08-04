@@ -33,10 +33,9 @@ Like this:
 
 
 ```js
-function plugin (prototype) {
-  prototype.internals.components.pageNumber = []
-}
-treant.register("pagination", plugin, function (options) {})
+treant.register("pagination", function (prototype) {
+    prototype.internals.components.pageNumber = []
+})
 ```
 
 And when you access it, it will be an array of sub components
@@ -57,7 +56,7 @@ then that will be used to instantiate the sub component.
 For example:
 
 ```js
-var PageNumber = treant.register("pagination:page-number", function (pagination) {})
+var PageNumber = treant.register("pagination:page-number")
 ```
 
 ```js

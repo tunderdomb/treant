@@ -68,11 +68,11 @@ with the addition that it sets `options.element` to `this.element`
 and `options.context` to `this` if its not defined.
 
 
-#### `component.dispatch(type, detail)`
+#### `component.dispatch(type[, detail])`
 
 **String** `type`
 
-**Object** `detail`
+**Object** `detail` optional
 
 Dispatches a `window.CustomEvent` on this component's element.
 If there's an event type defined on the internals, it uses that for the event definition.
@@ -128,12 +128,23 @@ Maps to `treant.hook.getSubComponentName(name)`.
 Resets the `this.components` object on this component.
 
 
-#### `component.assignSubComponents(transform)`
+#### `component.assignSubComponents([transform])`
 
-**Function|Boolean** `transform`
+**Function|Boolean** `transform` optional
+
+If the transform argument is a function, it receives two arguments,
+the element, and its sub-component name:
+
+```js
+function (element, name) {
+  return Component.create(element, hostComponent)
+}
+```
 
 Collects sub components for this element and assigns them by name to
 the component's `components` object.
+
+By default it runs `Component.create()` as a transform function.
 
 Component names are converted to camelCase.
 

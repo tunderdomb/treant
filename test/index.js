@@ -15,23 +15,6 @@ var scope = document.getElementById("scope")
 var scope2 = document.getElementById("scope2")
 var customAttribute = document.getElementById("custom-attribute")
 
-function test(name, create, test, after) {
-  if (!test) {
-    test = create
-    create = null
-  }
-  var element = document.createElement("div")
-  if (create) {
-    element = create(element)
-  }
-  else {
-    element.setAttribute("data-component", name)
-  }
-  document.body.appendChild(element)
-  test(element)
-  after && after()
-}
-
 describe("Component()", function () {
   describe("constructor", function () {
     it("should work without arguments", function () {
@@ -69,19 +52,17 @@ describe("Component()", function () {
     })
     // component.components.<Component>
     it("should create Component instances for sub components", function () {
-      function plugin (prototype) {
+      treant.register("pagination", function (prototype) {
         prototype.internals.convertSubComponents = true
-      }
-      treant.register("pagination", plugin, function (options) {})
+      })
       var component = treant.component(pagination)
       assert.instanceOf(component.components.pageNumber, treant.Component)
     })
     // component.components.[<subComponent>]
     it("should assign sub component arrays if defined", function () {
-      function plugin (prototype) {
+      treant.register("pagination", function (prototype) {
         prototype.internals.components.pageNumber = []
-      }
-      treant.register("pagination", plugin, function (options) {})
+      })
       var component = treant.component(pagination4, {})
       assert.isArray(component.components.pageNumber)
       assert.lengthOf(component.components.pageNumber, 4)
@@ -90,10 +71,9 @@ describe("Component()", function () {
 
   describe("prototype.assignSubComponents()", function () {
     it("should not run if autoAssign is disabled", function () {
-      function plugin (prototype) {
+      treant.register("pagination", function (prototype) {
         prototype.internals.autoAssign = false
-      }
-      treant.register("pagination", plugin, function (options) {})
+      })
       var component = treant.component(pagination)
       assert.isUndefined(component.components.pageNumber)
     })
@@ -137,15 +117,15 @@ describe("Component()", function () {
       assert.equal(data, eventData)
     })
     it("should register an bubbling and non bubbling event definition", function () {
-      var Pagination = treant.register("pagination", proto, function () {})
-      function proto () {
-        this.internals.defineEvent("hey", {
+      var Pagination = treant.register("pagination", function () {
+        this.internals.event("hey", {
           bubbles: true
         })
-        this.internals.defineEvent("ho", {
+        this.internals.event("ho", {
           bubbles: false
         })
-      }
+      })
+
       var component = new Pagination(pagination)
       var hey = false
       var ho = false
@@ -163,17 +143,17 @@ describe("Component()", function () {
       assert.isFalse(ho)
     })
     it("should register a cancellable event definition", function () {
-      var Pagination = treant.register("pagination", proto, function () {})
-      function proto () {
-        this.internals.defineEvent("cancellable", {
+      var Pagination = treant.register("pagination", function () {
+        this.internals.event("cancellable", {
           cancelable: true,
           bubbles: true
         })
-        this.internals.defineEvent("notcancellable", {
+        this.internals.event("notcancellable", {
           cancelable: false,
           bubbles: true
         })
-      }
+      })
+
       var component = new Pagination(pagination)
       var cancellable = false
       var notcancellable = false
@@ -203,57 +183,54 @@ describe("CustomComponent", function () {
   // new CustomComponent()
   it("should call the custom constructor", function () {
     var called = false
-    treant.register("pagination", function () {
-      called = true
+    treant.register("pagination", {
+      onCreate: function () {
+        called = true
+      }
     })
     treant.component(pagination)
     assert.isTrue(called)
   })
   // new CustomComponent()+
   it("should work with plugins", function () {
-    var called = false
-
     function testMethod () {}
 
     function plugin (prototype) {
       prototype.testMethod = testMethod
     }
-    var Pagination = treant.register("pagination", plugin, function () {
-      called = true
-    })
+
+    var Pagination = treant.register("pagination", plugin)
     treant.component(pagination)
-    assert.isTrue(called)
     assert.equal(Pagination.prototype.testMethod, testMethod)
   })
   // new CustomComponent()+
   it("should work with multiple plugins", function () {
-    var called = false
     function testMethod () {}
+
     function testMethod2 () {}
+
     function plugin (prototype) {
       prototype.testMethod = testMethod
     }
+
     function plugin2 (prototype) {
       prototype.testMethod2 = testMethod2
     }
 
-    var Pagination = treant.register("pagination", plugin, plugin2, function () {
-      called = true
-    })
+    var Pagination = treant.register("pagination", plugin, plugin2)
     treant.component(pagination)
-    assert.isTrue(called)
     assert.equal(Pagination.prototype.testMethod, testMethod)
     assert.equal(Pagination.prototype.testMethod2, testMethod2)
   })
   // new CustomComponent()
   it("should instantiate a custom component with the constructor", function () {
-    var Pagination = treant.register("pagination", function (options) {})
+    var Pagination = treant.register("pagination")
     var component = new Pagination()
     assert.instanceOf(component, Pagination)
   })
   // new CustomComponent(Element)
   it("should set the element of the custom component to the first argument", function () {
-    var Pagination = treant.register("pagination", function (options) {})
+    var Pagination = treant.register("pagination")
     var component = new Pagination(pagination)
     assert.equal(component.element, pagination)
   })
@@ -261,15 +238,17 @@ describe("CustomComponent", function () {
   it("should accept an options object as second argument", function () {
     var testOptions = {}
     var passedArguments = null
-    var Pagination = treant.register("pagination", function (options) {
-      passedArguments = options
+    var Pagination = treant.register("pagination", {
+      onCreate: function (options) {
+        passedArguments = options
+      }
     })
     new Pagination(pagination, testOptions)
     assert.equal(testOptions, passedArguments)
   })
   // CustomComponent extend Component
   it("should be an instance of the base Component", function () {
-    treant.register("pagination", function (options) {})
+    treant.register("pagination")
     var component = treant.component(pagination)
     assert.instanceOf(component, treant.Component)
   })
@@ -277,7 +256,7 @@ describe("CustomComponent", function () {
 
 describe("register()", function () {
   it("should return a constructor", function () {
-    var Pagination = treant.register("pagination", function (options) {})
+    var Pagination = treant.register("pagination")
     assert.isFunction(Pagination)
   })
   it("should work without a custom constructor", function () {
@@ -285,42 +264,9 @@ describe("register()", function () {
     var component = treant.component(pagination)
   })
   it("should allow overwriting existing registry entries", function () {
-    var Pagination = treant.register("pagination", function (options) {})
-    var Pagination2 = treant.register("pagination", function (options) {})
+    var Pagination = treant.register("pagination")
+    var Pagination2 = treant.register("pagination")
     assert.notEqual(Pagination, Pagination2)
-  })
-  it("should augment the prototype with plugins", function () {
-    function testMethod () {}
-    function plugin (prototype) {
-      prototype.testMethod = testMethod
-    }
-    var Pagination = treant.register("pagination", plugin, function (options) {})
-    assert.equal(Pagination.prototype.testMethod, testMethod)
-  })
-  it("should work with multiple plugins", function () {
-    function testMethod () {}
-    function testMethod2 () {}
-    function plugin (prototype) {
-      prototype.testMethod = testMethod
-    }
-    function plugin2 (prototype) {
-      prototype.testMethod2 = testMethod2
-    }
-    var Pagination = treant.register("pagination", plugin, plugin2, function (options) {})
-    assert.equal(Pagination.prototype.testMethod, testMethod)
-    assert.equal(Pagination.prototype.testMethod2, testMethod2)
-  })
-  it("should run plugins in order", function () {
-    function testMethod () {}
-    function testMethod2 () {}
-    function plugin (prototype) {
-      prototype.testMethod = testMethod
-    }
-    function plugin2 (prototype) {
-      prototype.testMethod = testMethod2
-    }
-    var Pagination = treant.register("pagination", plugin, plugin2, function (options) {})
-    assert.equal(Pagination.prototype.testMethod, testMethod2)
   })
 })
 
@@ -340,7 +286,7 @@ describe("component()", function () {
   })
   // treant.component(String)
   it("should create custom components if defined", function () {
-    var Pagination = treant.register("pagination", function (options) {})
+    var Pagination = treant.register("pagination")
     var component = treant.component("pagination")
     assert.instanceOf(component, Pagination)
   })
@@ -356,7 +302,7 @@ describe("component()", function () {
   })
   // treant.component(Element)
   it("should figure out the custom component from the name of an element", function () {
-    var Pagination = treant.register("pagination", function (options) {})
+    var Pagination = treant.register("pagination")
     var component = treant.component(pagination)
     assert.instanceOf(component, Pagination)
   })
@@ -370,13 +316,15 @@ describe("component()", function () {
 describe("storage", function () {
 
   it("should save and retrieve the component by element", function () {
-    var Pagination = treant.register("pagination", function () {})
+    var Pagination = treant.register("pagination", function () {
+    })
     var p = new Pagination(pagination)
     treant.storage.save(p)
     assert.equal(p, treant.storage.get(pagination))
   })
   it("should save and remove the component by element", function () {
-    var Pagination = treant.register("pagination", function () {})
+    var Pagination = treant.register("pagination", function () {
+    })
     var p = new Pagination(pagination2)
     treant.storage.save(p)
     treant.storage.remove(p)
@@ -386,47 +334,133 @@ describe("storage", function () {
 
 describe("Internals", function () {
 
-  it("should enable auto assign", function () {
-    treant.register("pagination", plugin, function (options) {})
-    function plugin (prototype) {
-      prototype.internals.autoAssign = true
+  it("should work with prototype object", function () {
+    function testMethod () {}
+    treant.register("pagination", {
+      testMethod: testMethod,
+      testProperty: 1
+    })
+    var component = treant.component(pagination)
+    assert.equal(component.testMethod, testMethod)
+    assert.equal(component.testProperty, 1)
+  })
+
+  it("should create a constructor via a prototype object", function () {
+    var testOptions = {}
+    var passedOptions = null
+    function testConstructor (options) {
+      passedOptions = options
     }
+    treant.register("pagination", {
+      onCreate: testConstructor
+    })
+    var component = treant.component(pagination, testOptions)
+    assert.isUndefined(component.onCreate)
+    assert.equal(testOptions, passedOptions)
+  })
+
+  it("should create a constructor via a internals", function () {
+    var testOptions = {}
+    var passedOptions = null
+    function testConstructor (options) {
+      passedOptions = options
+    }
+    treant.register("pagination", function (prototype, interals) {
+      interals.onCreate(testConstructor)
+    })
+    var component = treant.component(pagination, testOptions)
+    assert.isUndefined(component.onCreate)
+    assert.equal(testOptions, passedOptions)
+  })
+
+  it("should be chainable", function () {
+    treant.register("pagination", function (prototype, internals) {
+      internals
+          .onCreate(function (options) {
+
+          })
+          .event("close", {})
+          .attribute("value", 2)
+          .method("heyHo", function () {
+            this.letsGo()
+          })
+          .proto({
+            letsGo: function () {
+              this.heyHo()
+            }
+          })
+    })
+    var component = treant.component(pagination)
+    assert.isFunction(component.heyHo)
+    assert.isFunction(component.letsGo)
+  })
+
+  it("should be available on the constructor", function () {
+    treant
+        .register("pagination")
+        .internals
+        .onCreate(function (options) {})
+        .event("close", {})
+        .attribute("value", 2)
+        .method("heyHo", function () {
+          this.letsGo()
+        })
+        .proto({
+          letsGo: function () {
+            this.heyHo()
+          }
+        })
+
+    var component = treant.component(pagination)
+    assert.isFunction(component.heyHo)
+    assert.isFunction(component.letsGo)
+  })
+
+  it("should enable auto assign", function () {
+    treant.register("pagination", function (prototype) {
+      prototype.internals.autoAssign = true
+    })
+
+
     var component = treant.component(pagination)
     assert.isDefined(component.components.pageNumber)
   })
 
   it("should disable auto assign", function () {
-    treant.register("pagination", plugin, function (options) {})
-    function plugin (prototype) {
+    treant.register("pagination", function (prototype) {
       prototype.internals.autoAssign = false
-    }
+    })
+
+
     var component = treant.component(pagination)
     assert.isUndefined(component.components.pageNumber)
   })
 
   it("should convert sub components", function () {
-    treant.register("pagination", plugin, function (options) {})
-    function plugin (prototype) {
+    treant.register("pagination", function (prototype) {
       prototype.internals.convertSubComponents = true
-    }
+    })
+
     var component = treant.component(pagination)
     assert.instanceOf(component.components.pageNumber, treant.Component)
   })
 
   it("should not convert sub components", function () {
-    treant.register("pagination", plugin, function (options) {})
-    function plugin (prototype) {
+    treant.register("pagination", function (prototype) {
       prototype.internals.convertSubComponents = false
-    }
+    })
+
+
     var component = treant.component(pagination)
     assert.instanceOf(component.components.pageNumber, Element)
   })
 
   it("should collect all sub components into an array", function () {
-    treant.register("pagination", plugin, function (options) {})
-    function plugin (prototype) {
+    treant.register("pagination", function (prototype) {
       prototype.internals.components.pageNumber = []
-    }
+    })
+
+
     var component = treant.component(pagination)
     assert.isArray(component.components.pageNumber)
   })
@@ -434,19 +468,21 @@ describe("Internals", function () {
   describe("attributes", function () {
 
     it("should define a custom attribute", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("string")
-      }
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("string")
+      })
+
+
       var component = treant.component(pagination5)
       assert.isDefined(component.string)
     })
 
     it("should define a string attribute", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("string", {})
-      }
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("string", {})
+      })
+
+
       var component = treant.component(pagination5)
       assert.isDefined(component.string)
       assert.isString(component.string)
@@ -454,12 +490,13 @@ describe("Internals", function () {
     })
 
     it("should define a number attribute", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("number", {
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("number", {
           type: "number"
         })
-      }
+      })
+
+
       var component = treant.component(pagination5)
       assert.isDefined(component.number)
       assert.isNumber(component.number)
@@ -467,12 +504,13 @@ describe("Internals", function () {
     })
 
     it("should define a number attribute with a default number value", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("number", {
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("number", {
           'default': 20
         })
-      }
+      })
+
+
       var component = treant.component(pagination5)
       assert.isDefined(component.number)
       assert.isNumber(component.number)
@@ -480,10 +518,11 @@ describe("Internals", function () {
     })
 
     it("should define a number attribute with a default number value", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("number", 15)
-      }
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("number", 15)
+      })
+
+
       var component = treant.component(pagination5)
       assert.isDefined(component.number)
       assert.isNumber(component.number)
@@ -491,12 +530,13 @@ describe("Internals", function () {
     })
 
     it("should define a boolean attribute", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("boolean", {
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("boolean", {
           type: "boolean"
         })
-      }
+      })
+
+
       var component = treant.component(pagination5)
       assert.isDefined(component.boolean)
       assert.isBoolean(component.boolean)
@@ -504,10 +544,11 @@ describe("Internals", function () {
     })
 
     it("should have a default string value", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("string", "hello")
-      }
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("string", "hello")
+      })
+
+
       var component = treant.component(pagination)
       assert.isDefined(component.string)
       assert.isString(component.string)
@@ -515,13 +556,14 @@ describe("Internals", function () {
     })
 
     it("should have a default number value", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("number", 10)
-        prototype.internals.defineAttribute("number2", {
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("number", 10)
+        prototype.internals.attribute("number2", {
           'default': 20
         })
-      }
+      })
+
+
       var component = treant.component(pagination)
       assert.isDefined(component.number)
       assert.isNumber(component.number)
@@ -532,17 +574,17 @@ describe("Internals", function () {
     })
 
     it("should define a default boolean value", function () {
-      treant.register("pagination", plugin, function (options) {})
-      function plugin (prototype) {
-        prototype.internals.defineAttribute("boolean", true)
-        prototype.internals.defineAttribute("boolean2", false)
-        prototype.internals.defineAttribute("boolean3", {
+      treant.register("pagination", function (prototype) {
+        prototype.internals.attribute("boolean", true)
+        prototype.internals.attribute("boolean2", false)
+        prototype.internals.attribute("boolean3", {
           'default': true
         })
-        prototype.internals.defineAttribute("boolean4", {
+        prototype.internals.attribute("boolean4", {
           'default': false
         })
-      }
+      })
+
       var component = treant.component(pagination)
       assert.isDefined(component.boolean)
       assert.isBoolean(component.boolean)

@@ -1,5 +1,12 @@
 var object = module.exports = {}
 
+object.accessor = function (obj, name, get, set) {
+  Object.defineProperty(obj, name, {
+    get: get,
+    set: set
+  })
+}
+
 object.defineGetter = function (obj, name, fn) {
   Object.defineProperty(obj, name, {
     get: fn

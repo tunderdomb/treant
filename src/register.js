@@ -2,21 +2,8 @@ var registry = require("./registry")
 var Component = require("./Component")
 var Internals = require("./Internals")
 
-module.exports = function register (name, mixin, ComponentConstructor) {
-  if (!ComponentConstructor) {
-    ComponentConstructor = mixin
-    mixin = []
-  }
-  else {
-    // functions in-between are mixin
-    mixin = [].slice.call(arguments, 1, -1)
-    // main constructor is always last argument
-    ComponentConstructor = [].slice.call(arguments, -1)[0]
-  }
-
-  if (!ComponentConstructor) {
-    ComponentConstructor = function () {}
-  }
+module.exports = function register (name, mixin) {
+  mixin = [].slice.call(arguments, 1)
 
   function CustomComponent (element, options) {
     if (!(this instanceof CustomComponent)) {
@@ -27,7 +14,7 @@ module.exports = function register (name, mixin, ComponentConstructor) {
     Component.call(instance, element, options)
     // at this point custom constructors can already access the element and sub components
     // so they only receive the options object for convenience
-    ComponentConstructor.call(instance, options)
+    internals.create(instance, [options])
   }
 
   CustomComponent.prototype = Object.create(Component.prototype)
@@ -35,8 +22,14 @@ module.exports = function register (name, mixin, ComponentConstructor) {
   var internals = new Internals(CustomComponent.prototype)
   internals.autoAssign = true
   CustomComponent.prototype.internals = internals
+  CustomComponent.internals = internals
   mixin.forEach(function (mixin) {
-    mixin.call(CustomComponent.prototype, CustomComponent.prototype)
+    if (typeof mixin == "function") {
+      mixin.call(CustomComponent.prototype, CustomComponent.prototype, internals)
+    }
+    else {
+      internals.proto(mixin)
+    }
   })
 
   return registry.set(name, CustomComponent)

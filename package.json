@@ -1,6 +1,6 @@
 {
   "name": "treant",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "main": "index.js",
   "description": "Dependency free component library for the browser",
   "scripts": {

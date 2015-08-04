@@ -7,6 +7,8 @@ They are registered internally and can be instantiated with their name or their 
 
 Custom components can define their own api on their prototype,
 and do initialization in their own constructor.
+Via mixins, there can be any number of constructors, which during creation will be called
+in the order theye were defined. This way mixins can hook into component creation too.
 
 A custom components constructor is always called after the base `Component`'s.
 
@@ -24,41 +26,32 @@ During a custom component's definition, this happens in order:
 During instantiation, this happens inside the proxy constructor:
 
   - Call the base `Component`'s constructor
-  - Call the user provided constructor
+  - Call the user provided constructors
 
 
 ## Register custom components
 
 
 Before using them, you need to register custom components.
-These are essentially class declarations.
+It's much like declaring a class, but you can add several definitions to it.
 
-#### `treant.register(name, constructor)`
-
-**String** `name`
-
-**Function** `constructor(options)`
-
-Registers a custom component with this name, and this constructor.
-The name and the constructor is required.
-
-**The constructor is always the last argument.** See the below signature to understand more.
-
-Every constructor receives an options object,
-which may contain component specific data; e.g. needed to initialize the component.
-
-#### `treant.register(name, mixin..., constructor)`
+#### `treant.register(name, mixin...)`
 
 **String** `name`
 
-**Function...** `mixin(prototype)`
+**Function|Object...** `mixin(prototype, internals)`
 
-**Function** `constructor(options)`
+You can provide any number of mixin functions or objects,
+they will be applied in the order provided.
+Mixin functions receive the custom component's prototype and its internals as argument,
+their `this` value is the also the custom component's prototype.
+Their return value is ignored.
 
-You can provide any number of mixin functions.
-They will be executed in the order provided.
-These functions receive the custom component's prototype as their only argument,
-and their return value is ignored.
+Mixin objects are used to augment the prototype with their properties.
+Functions are defined as un-configurable, properties are defined configurable.
+
+If there's a property in the mixin object named `onCreate`, it's used to register a constructor.
+Learn more about internals in the [Internals](/docs/Internals.md) docs!
 
 Usages for mixins:
 
@@ -67,6 +60,26 @@ Usages for mixins:
   - this is the place where you can configure the internals
   - enables you to define common/shared behaviours that can be applied to multiple components
 
+Examples:
+
+```js
+treant.register("pagination", {
+  onCreate: function (options) {
+    // this is a constructor
+  },
+  testMethod: function(){},
+  testProperty: 1
+})
+```
+
+```js
+function someMixin(prototype) {
+  prototype.mixinMethod = function(){}
+}
+treant.register("pagination", someMixin, function(prototype) {
+  prototype.testMethod = function(){}
+})
+```
 
 ## Using custom components
 

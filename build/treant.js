@@ -55,6 +55,9 @@ var Internals = require("./Internals")
 module.exports = Component
 
 function Component (element, options) {
+  if (element && !(element instanceof Element)) {
+    throw new Error("element should be an Element instance or null")
+  }
   if (!(this instanceof Component)) {
     return new Component(element, options)
   }
@@ -156,7 +159,9 @@ Component.prototype = {
 }
 
 },{"./Internals":4,"./delegate":6,"./hook":8,"./registry":10}],4:[function(require,module,exports){
+var camelcase = require("camelcase")
 var merge = require("../util/merge")
+var object = require("../util/object")
 
 var defaultEventDefinition = {
   detail: null,
@@ -172,6 +177,7 @@ function Internals (master) {
   this.convertSubComponents = false
   this.components = {}
   this._events = {}
+  this._constructors = []
 
   Object.defineProperty(this, "_master", {
     get: function () {
@@ -180,8 +186,64 @@ function Internals (master) {
   })
 }
 
-Internals.prototype.defineEvent = function (type, definition) {
+Internals.prototype.onCreate = function (constructor) {
+  this._constructors.push(constructor)
+  return this
+}
+
+Internals.prototype.create = function (instance, args) {
+  this._constructors.forEach(function (constructor) {
+    constructor.apply(instance, args)
+  })
+}
+
+Internals.prototype.method = function (name, fn) {
+  object.method(this._master, name, fn)
+  return this
+}
+
+Internals.prototype.property = function (name, fn) {
+  object.property(this._master, name, fn)
+  return this
+}
+
+Internals.prototype.get = function (name, fn) {
+  object.defineGetter(this._master, name, fn)
+  return this
+}
+
+Internals.prototype.set = function (name, fn) {
+  object.defineGetter(this._master, name, fn)
+  return this
+}
+
+Internals.prototype.accessor = function (name, get, set) {
+  object.accessor(this._master, name, get, set)
+  return this
+}
+
+Internals.prototype.proto = function (prototype) {
+  for (var prop in prototype) {
+    if (prototype.hasOwnProperty(prop)) {
+      if (typeof prototype[prop] == "function") {
+        if (prop === "onCreate") {
+          this.onCreate(prototype[prop])
+        }
+        else {
+          this.method(prop, prototype[prop])
+        }
+      }
+      else {
+        this.property(prop, prototype[prop])
+      }
+    }
+  }
+  return this
+}
+
+Internals.prototype.event = function (type, definition) {
   this._events[type] = definition
+  return this
 }
 
 Internals.prototype.getEventDefinition = function (type, detail) {
@@ -190,10 +252,10 @@ Internals.prototype.getEventDefinition = function (type, detail) {
   return definition
 }
 
-Internals.prototype.defineAttribute = function (name, def) {
+Internals.prototype.attribute = function (name, def) {
   var master = this._master
   if (!master) {
-    return
+    return this
   }
 
   if (def == null) {
@@ -243,7 +305,7 @@ Internals.prototype.defineAttribute = function (name, def) {
     case "boolean":
       shouldRemove = function (value) { return value === false }
       parseValue = function (value) { return value != null }
-      stringifyValue = function (value) { return "" }
+      stringifyValue = function () { return "" }
       break
     case "number":
       parseValue = function (value) { return parseInt(value, 10) }
@@ -256,7 +318,7 @@ Internals.prototype.defineAttribute = function (name, def) {
       stringifyValue = function (value) { return value ? ""+value : "" }
   }
 
-  Object.defineProperty(master, name, {
+  Object.defineProperty(master, camelcase(name), {
     get: getter || function () {
       var value = this.element.getAttribute(name)
       if (value == null) {
@@ -274,9 +336,11 @@ Internals.prototype.defineAttribute = function (name, def) {
       }
     }
   })
+
+  return this
 }
 
-},{"../util/merge":13}],5:[function(require,module,exports){
+},{"../util/merge":13,"../util/object":14,"camelcase":2}],5:[function(require,module,exports){
 var Component = require("./Component")
 var hook = require("./hook")
 
@@ -576,21 +640,8 @@ var registry = require("./registry")
 var Component = require("./Component")
 var Internals = require("./Internals")
 
-module.exports = function register (name, mixin, ComponentConstructor) {
-  if (!ComponentConstructor) {
-    ComponentConstructor = mixin
-    mixin = []
-  }
-  else {
-    // functions in-between are mixin
-    mixin = [].slice.call(arguments, 1, -1)
-    // main constructor is always last argument
-    ComponentConstructor = [].slice.call(arguments, -1)[0]
-  }
-
-  if (!ComponentConstructor) {
-    ComponentConstructor = function () {}
-  }
+module.exports = function register (name, mixin) {
+  mixin = [].slice.call(arguments, 1)
 
   function CustomComponent (element, options) {
     if (!(this instanceof CustomComponent)) {
@@ -601,7 +652,7 @@ module.exports = function register (name, mixin, ComponentConstructor) {
     Component.call(instance, element, options)
     // at this point custom constructors can already access the element and sub components
     // so they only receive the options object for convenience
-    ComponentConstructor.call(instance, options)
+    internals.create(instance, [options])
   }
 
   CustomComponent.prototype = Object.create(Component.prototype)
@@ -609,8 +660,14 @@ module.exports = function register (name, mixin, ComponentConstructor) {
   var internals = new Internals(CustomComponent.prototype)
   internals.autoAssign = true
   CustomComponent.prototype.internals = internals
+  CustomComponent.internals = internals
   mixin.forEach(function (mixin) {
-    mixin.call(CustomComponent.prototype, CustomComponent.prototype)
+    if (typeof mixin == "function") {
+      mixin.call(CustomComponent.prototype, CustomComponent.prototype, internals)
+    }
+    else {
+      internals.proto(mixin)
+    }
   })
 
   return registry.set(name, CustomComponent)
@@ -677,6 +734,13 @@ module.exports = function( obj, extension ){
 
 },{"./extend":12}],14:[function(require,module,exports){
 var object = module.exports = {}
+
+object.accessor = function (obj, name, get, set) {
+  Object.defineProperty(obj, name, {
+    get: get,
+    set: set
+  })
+}
 
 object.defineGetter = function (obj, name, fn) {
   Object.defineProperty(obj, name, {

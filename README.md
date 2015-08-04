@@ -64,21 +64,22 @@ function plugin (prototype) {
   }
 }
 function plugin2 (prototype) {
-  // this is a mixin too
-  prototype.ho = function () {
+  // this is a mixin too, this === prototype
+  this.ho = function () {
     return "ho "
   }
 }
-function pagination (prototype) {
-  // configure internals
-  prototype.internals.components.pageNumber = []
-}
 
-var Pagination = treant.register("pagination", plugin, plugin2, pagination, function (options) {
-  // this is a constructor
-  this.lets = options.lets
-  console.log(this.element)
-  console.log(this.components)
+var Pagination = treant.register("pagination", plugin, plugin2, function (prototype, internals) {
+  // prototype.internals === internals
+  internals.components.pageNumber = []
+
+  internals.onCreate(function (options) {
+     // this is a constructor
+     this.lets = options.lets
+     console.log(this.element)
+     console.log(this.components)
+   })
 })
 
 var pagination = treant.component("pagination", {lets: "go"})
@@ -108,7 +109,7 @@ console.log(pagination.hey(), pagination.ho(), "let's ", pagination.lets)
   - if you register sub components too, then the matching constructor will be used
 
     ```js
-    var PageNumber = treant.register("pagination:page-number", function(pagination){})
+    var PageNumber = treant.register("pagination:page-number")
     pagination.components.pageNumber instanceOf PageNumber
     ```
 
@@ -117,10 +118,9 @@ console.log(pagination.hey(), pagination.ho(), "let's ", pagination.lets)
   - if you need sub components as arrays, use the internals to pre-define an array like this:
 
     ```js
-    function plugin (prototype) {
+    treant.register("pagination", function plugin (prototype) {
       prototype.internals.components.pageNumber = []
-    }
-    treant.register("pagination", plugin, function (options) {})
+    })
 
     pagination.components.pageNumber.length
     ```
@@ -143,8 +143,8 @@ console.log(pagination.hey(), pagination.ho(), "let's ", pagination.lets)
         return parseInt(this.getValue())
       }
     }
-    treant.register("text-input", inputBase, function(){})
-    treant.register("number-input", inputBase, numberInputBase, function(){})
+    treant.register("text-input", inputBase)
+    treant.register("number-input", inputBase, numberInputBase)
     ```
 
   - You can override what attribute is used for the hook

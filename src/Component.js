@@ -6,6 +6,9 @@ var Internals = require("./Internals")
 module.exports = Component
 
 function Component (element, options) {
+  if (element && !(element instanceof Element)) {
+    throw new Error("element should be an Element instance or null")
+  }
   if (!(this instanceof Component)) {
     return new Component(element, options)
   }
