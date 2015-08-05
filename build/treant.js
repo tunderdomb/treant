@@ -291,6 +291,7 @@ Internals.prototype.attribute = function (name, def) {
   var getter
   var setter
   var onchange
+  var property = camelcase(name)
 
   switch (typeOfDef) {
     case "boolean":
@@ -343,7 +344,7 @@ Internals.prototype.attribute = function (name, def) {
       stringifyValue = function (value) { return value == null ? null : value ? ""+value : "" }
   }
 
-  this._attributes[name] = {
+  this._attributes[property] = {
     get: getValue,
     set: setValue
   }
@@ -357,20 +358,21 @@ Internals.prototype.attribute = function (name, def) {
   }
 
   function setValue(value, callOnchange) {
+    var old = getValue.call(this, false)
     if (shouldRemove(value)) {
       this.element.removeAttribute(name)
     }
-    else {
-      value = stringifyValue ? stringifyValue(value) : value
-      var old = getValue.call(this, false)
-      if (old != value) {
-        this.element.setAttribute(name, value)
-        onchange && callOnchange != false && onchange.call(this, old, value)
-      }
+    else if (old === value) {
+      return
     }
+    else {
+      var newValue = stringifyValue ? stringifyValue(value) : value
+      this.element.setAttribute(name, newValue)
+    }
+    onchange && callOnchange != false && onchange.call(this, old, value)
   }
 
-  Object.defineProperty(master, camelcase(name), {
+  Object.defineProperty(master, property, {
     get: getter || getValue,
     set: setter || setValue
   })

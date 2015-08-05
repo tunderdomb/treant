@@ -485,21 +485,21 @@ describe("Internals", function () {
 
     it("should define a custom attribute", function () {
       treant.register("pagination", function (prototype) {
-        prototype.internals.attribute("string")
+        prototype.internals.attribute("custom-string")
       })
 
       var component = treant.component(pagination5)
-      assert.isDefined(component.string)
+      assert.isDefined(component.customString)
     })
 
     it("should define a string attribute", function () {
       treant.register("pagination", function (prototype) {
-        prototype.internals.attribute("string")
+        prototype.internals.attribute("custom-string")
       })
 
       var component = treant.component(pagination5)
-      assert.isString(component.string)
-      assert.equal(component.string, "hello")
+      assert.isString(component.customString)
+      assert.equal(component.customString, "hello")
     })
 
     it("should define a number attribute", function () {
@@ -557,14 +557,14 @@ describe("Internals", function () {
 
     it("should have a default string value", function () {
       treant.register("pagination", function (prototype) {
-        prototype.internals.attribute("string", "hello")
+        prototype.internals.attribute("custom-string", "hello")
       })
 
 
       var component = treant.component(pagination)
-      assert.isDefined(component.string)
-      assert.isString(component.string)
-      assert.equal(component.string, "hello")
+      assert.isDefined(component.customString)
+      assert.isString(component.customString)
+      assert.equal(component.customString, "hello")
     })
 
     it("should have a default number value", function () {
@@ -613,29 +613,45 @@ describe("Internals", function () {
     })
 
     it("should call the onchange callback if the value changed", function () {
-      var newValue = "new"
       var oldValue = "old"
-      var testOldValue = ""
-      var testNewValue = ""
+      var newValue = "new"
       var called = false
 
       treant.register("pagination", function (prototype, internals) {
         internals.attribute("test", {
           default: oldValue,
           onchange: function (old, value) {
-            testOldValue = old
-            testNewValue = value
             called = true
           }
         })
       })
       var component = treant.component(pagination6)
-      assert.equal(component.test, oldValue)
+      assert.isFalse(called)
       component.test = oldValue
       assert.isFalse(called)
       component.test = newValue
       assert.isTrue(called)
-      assert.equal(component.test, newValue)
+    })
+
+    it("should call the onchange callback with proper arguments", function () {
+      var oldValue = false
+      var newValue = true
+      var testOldValue = null
+      var testNewValue = null
+
+      treant.register("pagination", function (prototype, internals) {
+        internals.attribute("test2", {
+          default: oldValue,
+          onchange: function (old, value) {
+            testOldValue = old
+            testNewValue = value
+          }
+        })
+      })
+      var component = treant.component(pagination6)
+      assert.equal(component.test2, oldValue)
+      component.test2 = newValue
+      assert.equal(component.test2, newValue)
       assert.equal(testOldValue, oldValue)
       assert.equal(testNewValue, newValue)
     })
