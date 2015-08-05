@@ -129,17 +129,29 @@ but you can set a sensible default here if you want.
 
 ### `internals.attribute(name, definition)`
 
-**String** `name` the attribute name on the element. This will be converted to camelCase when added as a property.
+**String** `name`
 
-**Object|String|Boolean|Number** `definition` If not a definition object, this value will be used to guess the type, and also as the default value.
+the attribute name on the element. This will be converted to camelCase when added as a property.
 
-**String** `definition.type` `"string"`, `"number"`, `"float"`, `"boolean"`. According to this, the actual attribute value will be converted from string.
+**Object|String|Boolean|Number** `definition`
 
-**String|Boolean|Number** `definition.default` a value returned when the element's attribute is `null` (not set).
+If not a definition object, this value will be used to guess the type, and also as the default value.
 
-**Function** `definition.get` optional
+**String** `definition.type` `"string"`, `"number"`, `"float"`, `"boolean"`.
 
-**Function** `definition.set` optional
+According to this, the actual attribute value will be converted from string.
+
+**String|Boolean|Number** `definition.default`
+
+a value returned when the element's attribute is `null` (not set).
+It's also the value that will be set on the element if it's not set already during creation.
+During initialization, the onchange will not be called.
+
+**Function** `definition.get` optional A custom getter that will substitute the default getter.
+
+**Function** `definition.set` optional A custom setter that will substitute the default setter. It's signature is: `function(value)`
+
+**Function** `definition.onchange` optional A callback that is called when the value changes. The signature is: `function(oldValue, newValue)`
 
 Register an attribute getter/setter on the prototype.
 

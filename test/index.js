@@ -11,6 +11,7 @@ var pagination2 = document.getElementById("pagination2")
 var pagination3 = document.getElementById("pagination3")
 var pagination4 = document.getElementById("pagination4")
 var pagination5 = document.getElementById("pagination5")
+var pagination6 = document.getElementById("pagination6")
 var scope = document.getElementById("scope")
 var scope2 = document.getElementById("scope2")
 var customAttribute = document.getElementById("custom-attribute")
@@ -66,6 +67,14 @@ describe("Component()", function () {
       var component = treant.component(pagination4, {})
       assert.isArray(component.components.pageNumber)
       assert.lengthOf(component.components.pageNumber, 4)
+    })
+    it("should assign default array for sub components", function () {
+      treant.register("pagination", function (prototype) {
+        prototype.internals.components.pageNumber = []
+      })
+      var component = treant.component(pagination6, {})
+      assert.isArray(component.components.pageNumber)
+      assert.lengthOf(component.components.pageNumber, 0)
     })
   })
 
@@ -311,6 +320,14 @@ describe("component()", function () {
     var component = treant.component(pagination)
     assert.instanceOf(component, treant.Component)
   })
+
+  it("should create an array of components", function () {
+    var Pagination = treant.register("pagination")
+    var components = treant.component.all("pagination", scope2)
+    assert.isArray(components)
+    assert.lengthOf(components, 4)
+    assert.instanceOf(components[0], Pagination)
+  })
 })
 
 describe("storage", function () {
@@ -460,7 +477,6 @@ describe("Internals", function () {
       prototype.internals.components.pageNumber = []
     })
 
-
     var component = treant.component(pagination)
     assert.isArray(component.components.pageNumber)
   })
@@ -472,19 +488,16 @@ describe("Internals", function () {
         prototype.internals.attribute("string")
       })
 
-
       var component = treant.component(pagination5)
       assert.isDefined(component.string)
     })
 
     it("should define a string attribute", function () {
       treant.register("pagination", function (prototype) {
-        prototype.internals.attribute("string", {})
+        prototype.internals.attribute("string")
       })
 
-
       var component = treant.component(pagination5)
-      assert.isDefined(component.string)
       assert.isString(component.string)
       assert.equal(component.string, "hello")
     })
@@ -495,7 +508,6 @@ describe("Internals", function () {
           type: "number"
         })
       })
-
 
       var component = treant.component(pagination5)
       assert.isDefined(component.number)
@@ -563,8 +575,8 @@ describe("Internals", function () {
         })
       })
 
-
       var component = treant.component(pagination)
+      assert.equal(pagination.getAttribute("number"), "10")
       assert.isDefined(component.number)
       assert.isNumber(component.number)
       assert.equal(component.number, 10)
@@ -598,6 +610,34 @@ describe("Internals", function () {
       assert.isDefined(component.boolean4)
       assert.isBoolean(component.boolean4)
       assert.equal(component.boolean4, false)
+    })
+
+    it("should call the onchange callback if the value changed", function () {
+      var newValue = "new"
+      var oldValue = "old"
+      var testOldValue = ""
+      var testNewValue = ""
+      var called = false
+
+      treant.register("pagination", function (prototype, internals) {
+        internals.attribute("test", {
+          default: oldValue,
+          onchange: function (old, value) {
+            testOldValue = old
+            testNewValue = value
+            called = true
+          }
+        })
+      })
+      var component = treant.component(pagination6)
+      assert.equal(component.test, oldValue)
+      component.test = oldValue
+      assert.isFalse(called)
+      component.test = newValue
+      assert.isTrue(called)
+      assert.equal(component.test, newValue)
+      assert.equal(testOldValue, oldValue)
+      assert.equal(testNewValue, newValue)
     })
   })
 })

@@ -13,7 +13,7 @@ function component (name, root, options) {
       options = root
       root = null
     }
-    // component("string", Element)
+    // component("string"[, Element])
     element = hook.findComponent(name, root)
   }
   // component(Element[, {}])
@@ -24,4 +24,29 @@ function component (name, root, options) {
   }
 
   return Component.create(element, options)
+}
+
+component.all = function (name, root, options) {
+  var elements = []
+
+  // component("string")
+  if (typeof name == "string") {
+    // component("string"[, {}])
+    if (!(root instanceof Element)) {
+      options = root
+      root = null
+    }
+    // component("string"[, Element])
+    elements = hook.findAllComponent(name, root)
+  }
+  // component(Element[][, {}])
+  else if (Array.isArray(name)) {
+    elements = name
+    options = root
+    root = null
+  }
+
+  return [].map.call(elements, function (element) {
+    return Component.create(element, options)
+  })
 }

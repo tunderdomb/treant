@@ -68,6 +68,10 @@ function Component (element, options) {
   if (this.element && this.internals.autoAssign) {
     this.assignSubComponents()
   }
+
+  if (this.element) {
+    this.internals.resetAttributes(this)
+  }
 }
 
 Component.create = function (element, options) {
@@ -133,6 +137,18 @@ Component.prototype = {
   assignSubComponents: function (transform) {
     var hostComponent = this
     var subComponents = hook.findSubComponents(this.getMainComponentName(false), this.element)
+    var internals = this.internals
+
+    for (var name in internals.components) {
+      if (internals.components.hasOwnProperty(name)) {
+        if (Array.isArray(internals.components[name])) {
+          this.components[name] = []
+        }
+        else {
+          this.components[name] = internals.components[name]
+        }
+      }
+    }
 
     if (!subComponents.length) {
       return
@@ -143,8 +159,6 @@ Component.prototype = {
         return Component.create(element, hostComponent)
       }
     }
-
-    var internals = this.internals
 
     hook.assignSubComponents(this.components, subComponents, transform, function (components, name, element) {
       if (Array.isArray(internals.components[name])) {
@@ -178,6 +192,7 @@ function Internals (master) {
   this.components = {}
   this._events = {}
   this._constructors = []
+  this._attributes = {}
 
   Object.defineProperty(this, "_master", {
     get: function () {
@@ -252,6 +267,14 @@ Internals.prototype.getEventDefinition = function (type, detail) {
   return definition
 }
 
+Internals.prototype.resetAttributes = function (instance) {
+  for (var name in this._attributes) {
+    if (this._attributes.hasOwnProperty(name)) {
+      this._attributes[name].set.call(instance, instance[name], false)
+    }
+  }
+}
+
 Internals.prototype.attribute = function (name, def) {
   var master = this._master
   if (!master) {
@@ -267,6 +290,7 @@ Internals.prototype.attribute = function (name, def) {
   var defaultValue
   var getter
   var setter
+  var onchange
 
   switch (typeOfDef) {
     case "boolean":
@@ -293,6 +317,7 @@ Internals.prototype.attribute = function (name, def) {
       }
       getter = def["get"]
       setter = def["set"]
+      onchange = def["onchange"]
   }
 
   var parseValue
@@ -308,33 +333,46 @@ Internals.prototype.attribute = function (name, def) {
       stringifyValue = function () { return "" }
       break
     case "number":
-      parseValue = function (value) { return parseInt(value, 10) }
+      parseValue = function (value) { return value == null ? null : parseInt(value, 10) }
       break
     case "float":
-      parseValue = function (value) { return parseFloat(value) }
+      parseValue = function (value) { return value == null ? null : parseFloat(value) }
       break
     case "string":
     default:
-      stringifyValue = function (value) { return value ? ""+value : "" }
+      stringifyValue = function (value) { return value == null ? null : value ? ""+value : "" }
+  }
+
+  this._attributes[name] = {
+    get: getValue,
+    set: setValue
+  }
+
+  function getValue(useDefault) {
+    var value = this.element.getAttribute(name)
+    if (value == null && useDefault != false) {
+      return defaultValue
+    }
+    return parseValue ? parseValue(value) : value
+  }
+
+  function setValue(value, callOnchange) {
+    if (shouldRemove(value)) {
+      this.element.removeAttribute(name)
+    }
+    else {
+      value = stringifyValue ? stringifyValue(value) : value
+      var old = getValue.call(this, false)
+      if (old != value) {
+        this.element.setAttribute(name, value)
+        onchange && callOnchange != false && onchange.call(this, old, value)
+      }
+    }
   }
 
   Object.defineProperty(master, camelcase(name), {
-    get: getter || function () {
-      var value = this.element.getAttribute(name)
-      if (value == null) {
-        return defaultValue
-      }
-      return parseValue ? parseValue(value) : value
-    },
-    set: setter || function (value) {
-      if (shouldRemove(value)) {
-        this.element.removeAttribute(name)
-      }
-      else {
-        value = stringifyValue ? stringifyValue(value) : stringifyValue
-        this.element.setAttribute(name, value)
-      }
-    }
+    get: getter || getValue,
+    set: setter || setValue
   })
 
   return this
@@ -356,7 +394,7 @@ function component (name, root, options) {
       options = root
       root = null
     }
-    // component("string", Element)
+    // component("string"[, Element])
     element = hook.findComponent(name, root)
   }
   // component(Element[, {}])
@@ -367,6 +405,31 @@ function component (name, root, options) {
   }
 
   return Component.create(element, options)
+}
+
+component.all = function (name, root, options) {
+  var elements = []
+
+  // component("string")
+  if (typeof name == "string") {
+    // component("string"[, {}])
+    if (!(root instanceof Element)) {
+      options = root
+      root = null
+    }
+    // component("string"[, Element])
+    elements = hook.findAllComponent(name, root)
+  }
+  // component(Element[][, {}])
+  else if (Array.isArray(name)) {
+    elements = name
+    options = root
+    root = null
+  }
+
+  return [].map.call(elements, function (element) {
+    return Component.create(element, options)
+  })
 }
 
 },{"./Component":3,"./hook":8}],6:[function(require,module,exports){

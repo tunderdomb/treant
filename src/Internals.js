@@ -17,6 +17,7 @@ function Internals (master) {
   this.components = {}
   this._events = {}
   this._constructors = []
+  this._attributes = {}
 
   Object.defineProperty(this, "_master", {
     get: function () {
@@ -91,6 +92,14 @@ Internals.prototype.getEventDefinition = function (type, detail) {
   return definition
 }
 
+Internals.prototype.resetAttributes = function (instance) {
+  for (var name in this._attributes) {
+    if (this._attributes.hasOwnProperty(name)) {
+      this._attributes[name].set.call(instance, instance[name], false)
+    }
+  }
+}
+
 Internals.prototype.attribute = function (name, def) {
   var master = this._master
   if (!master) {
@@ -106,6 +115,7 @@ Internals.prototype.attribute = function (name, def) {
   var defaultValue
   var getter
   var setter
+  var onchange
 
   switch (typeOfDef) {
     case "boolean":
@@ -132,6 +142,7 @@ Internals.prototype.attribute = function (name, def) {
       }
       getter = def["get"]
       setter = def["set"]
+      onchange = def["onchange"]
   }
 
   var parseValue
@@ -147,33 +158,46 @@ Internals.prototype.attribute = function (name, def) {
       stringifyValue = function () { return "" }
       break
     case "number":
-      parseValue = function (value) { return parseInt(value, 10) }
+      parseValue = function (value) { return value == null ? null : parseInt(value, 10) }
       break
     case "float":
-      parseValue = function (value) { return parseFloat(value) }
+      parseValue = function (value) { return value == null ? null : parseFloat(value) }
       break
     case "string":
     default:
-      stringifyValue = function (value) { return value ? ""+value : "" }
+      stringifyValue = function (value) { return value == null ? null : value ? ""+value : "" }
+  }
+
+  this._attributes[name] = {
+    get: getValue,
+    set: setValue
+  }
+
+  function getValue(useDefault) {
+    var value = this.element.getAttribute(name)
+    if (value == null && useDefault != false) {
+      return defaultValue
+    }
+    return parseValue ? parseValue(value) : value
+  }
+
+  function setValue(value, callOnchange) {
+    if (shouldRemove(value)) {
+      this.element.removeAttribute(name)
+    }
+    else {
+      value = stringifyValue ? stringifyValue(value) : value
+      var old = getValue.call(this, false)
+      if (old != value) {
+        this.element.setAttribute(name, value)
+        onchange && callOnchange != false && onchange.call(this, old, value)
+      }
+    }
   }
 
   Object.defineProperty(master, camelcase(name), {
-    get: getter || function () {
-      var value = this.element.getAttribute(name)
-      if (value == null) {
-        return defaultValue
-      }
-      return parseValue ? parseValue(value) : value
-    },
-    set: setter || function (value) {
-      if (shouldRemove(value)) {
-        this.element.removeAttribute(name)
-      }
-      else {
-        value = stringifyValue ? stringifyValue(value) : stringifyValue
-        this.element.setAttribute(name, value)
-      }
-    }
+    get: getter || getValue,
+    set: setter || setValue
   })
 
   return this

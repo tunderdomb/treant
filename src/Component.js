@@ -19,6 +19,10 @@ function Component (element, options) {
   if (this.element && this.internals.autoAssign) {
     this.assignSubComponents()
   }
+
+  if (this.element) {
+    this.internals.resetAttributes(this)
+  }
 }
 
 Component.create = function (element, options) {
@@ -84,6 +88,18 @@ Component.prototype = {
   assignSubComponents: function (transform) {
     var hostComponent = this
     var subComponents = hook.findSubComponents(this.getMainComponentName(false), this.element)
+    var internals = this.internals
+
+    for (var name in internals.components) {
+      if (internals.components.hasOwnProperty(name)) {
+        if (Array.isArray(internals.components[name])) {
+          this.components[name] = []
+        }
+        else {
+          this.components[name] = internals.components[name]
+        }
+      }
+    }
 
     if (!subComponents.length) {
       return
@@ -94,8 +110,6 @@ Component.prototype = {
         return Component.create(element, hostComponent)
       }
     }
-
-    var internals = this.internals
 
     hook.assignSubComponents(this.components, subComponents, transform, function (components, name, element) {
       if (Array.isArray(internals.components[name])) {
