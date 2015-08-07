@@ -21,27 +21,33 @@ function setHookAttribute (hook) {
 function createComponentSelector (name, operator) {
   name = name && '"' + name + '"'
   operator = name ? operator || "=" : ""
-  return '[' + COMPONENT_ATTRIBUTE + operator + name + ']'
+  return "[" + COMPONENT_ATTRIBUTE + operator + name + "]"
+}
+
+function compose (name, extra, operator) {
+  return createComponentSelector(name, operator)+extra
+}
+
+function findComposed (selector, root) {
+  return (root || document).querySelector(selector)
+}
+
+function findAllComposed (selector, root) {
+  return (root || document).querySelectorAll(selector)
 }
 
 function findComponent (name, root) {
-  return (root || document).querySelector(createComponentSelector(name))
+  return findComposed(createComponentSelector(name), root)
 }
 
 function findAllComponent (name, root) {
-  return [].slice.call((root || document).querySelectorAll(createComponentSelector(name)))
-}
-
-function findSubComponents (name, root) {
-  var elements = (root || document).querySelectorAll(createComponentSelector(name, "^="))
-  return filter(elements, function (element, componentName, mainComponentName, subComponentName) {
-    return subComponentName && name === mainComponentName
-  })
+  return [].slice.call(findAllComposed(createComponentSelector(name), root))
 }
 
 function getComponentName (element, cc) {
+  if (!element) return ""
   cc = cc == undefined || cc
-  var value = element.getAttribute(COMPONENT_ATTRIBUTE)
+  var value = typeof element == "string" ? element : element.getAttribute(COMPONENT_ATTRIBUTE) || ""
   return cc ? camelcase(value) : value
 }
 
@@ -59,15 +65,28 @@ function getSubComponentName (element, cc) {
   return cc && value ? camelcase(value) : value
 }
 
+function getComponentNameList (element, cc) {
+  return getComponentName(element, cc).split(/\s+/)
+}
+
+function findSubComponents (mainName, root) {
+  var elements = findAllComposed(createComponentSelector(mainName+":", "*="), root)
+  return filter(elements, function (element, componentName) {
+    return getComponentNameList(componentName, false).some(function (name) {
+      return getMainComponentName(name, false) == mainName && getSubComponentName(name)
+    })
+  })
+}
+
 function assignSubComponents (obj, subComponents, transform, assign) {
   return subComponents.reduce(function (obj, element) {
-    var name = getSubComponentName(element)
-    if (name) {
-
+    getComponentNameList(element, false).forEach(function (name) {
+      name = getSubComponentName(name, false)
       element = typeof transform == "function"
-        ? transform(element, name)
-        : element
-
+          // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
+          ? transform(element, name)
+          : element
+      name = camelcase(name)
       if (typeof assign == "function") {
         assign(obj, name, element)
       }
@@ -77,7 +96,7 @@ function assignSubComponents (obj, subComponents, transform, assign) {
       else {
         obj[name] = element
       }
-    }
+    })
     return obj
   }, obj)
 }
@@ -86,7 +105,7 @@ function filter (elements, filter) {
   switch (typeof filter) {
     case "function":
       return [].slice.call(elements).filter(function (element) {
-        return filter(element, getComponentName(element, false), getMainComponentName(element, false), getSubComponentName(element, false))
+        return filter(element, getComponentName(element, false))
       })
       break
     case "string":

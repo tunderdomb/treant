@@ -4,49 +4,26 @@ var hook = require("./hook")
 module.exports = component
 
 function component (name, root, options) {
-  var element = null
-
-  // component("string")
-  if (typeof name == "string") {
-    // component("string"[, {}])
-    if (!(root instanceof Element)) {
-      options = root
-      root = null
-    }
-    // component("string"[, Element])
-    element = hook.findComponent(name, root)
-  }
-  // component(Element[, {}])
-  else if (name instanceof Element) {
-    element = name
+  // component("string"[, {}])
+  if (!(root instanceof Element)) {
     options = root
     root = null
   }
+  var element = hook.findComponent(name, root)
 
-  return Component.create(element, options)
+  return Component.create(name, element, options)
 }
 
 component.all = function (name, root, options) {
-  var elements = []
-
-  // component("string")
-  if (typeof name == "string") {
-    // component("string"[, {}])
-    if (!(root instanceof Element)) {
-      options = root
-      root = null
-    }
-    // component("string"[, Element])
-    elements = hook.findAllComponent(name, root)
-  }
-  // component(Element[][, {}])
-  else if (Array.isArray(name)) {
-    elements = name
+  // component("string"[, {}])
+  if (!(root instanceof Element)) {
     options = root
     root = null
   }
+  // component("string"[, Element])
+  var elements = hook.findAllComponent(name, root)
 
   return [].map.call(elements, function (element) {
-    return Component.create(element, options)
+    return Component.create(name, element, options)
   })
 }

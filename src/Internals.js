@@ -1,6 +1,10 @@
 var camelcase = require("camelcase")
+var extend = require("../util/extend")
 var merge = require("../util/merge")
 var object = require("../util/object")
+var delegate = require("./delegate")
+var storage = require("./storage")
+var hook = require("./hook")
 
 var defaultEventDefinition = {
   detail: null,
@@ -11,19 +15,48 @@ var defaultEventDefinition = {
 
 module.exports = Internals
 
-function Internals (master) {
+function Internals (master, name) {
+  this.name = name
   this.autoAssign = true
-  this.convertSubComponents = false
   this.components = {}
   this._events = {}
   this._constructors = []
   this._attributes = {}
+  this._actions = []
 
-  Object.defineProperty(this, "_master", {
+  Object.defineProperty(this, "_masterConstructor", {
     get: function () {
       return master
     }
   })
+  Object.defineProperty(this, "_master", {
+    get: function () {
+      return master.prototype
+    }
+  })
+}
+
+Internals.prototype.extend = function (ComponentConstructor) {
+  this._masterConstructor.prototype = Object.create(ComponentConstructor.prototype)
+  this._masterConstructor.prototype.constructor = this._masterConstructor
+  var internals = ComponentConstructor.internals
+  this._masterConstructor.prototype.internals = this
+  this._masterConstructor.internals = this
+  if (internals) {
+    this.autoAssign = internals.autoAssign
+    extend(this.components, internals.components)
+    extend(this._events, internals._events)
+    this._constructors = this._constructors.concat(internals._constructors)
+    extend(this._attributes, internals._attributes)
+    internals._actions.forEach(function (args) {
+      var event = args[0]
+      var matches = args[1]
+      var matcher = this.action.call(this, event)
+      matches.forEach(function (args) {
+        matcher.match.apply(matcher, args)
+      })
+    }, this)
+  }
 }
 
 Internals.prototype.onCreate = function (constructor) {
@@ -81,6 +114,73 @@ Internals.prototype.proto = function (prototype) {
   return this
 }
 
+Internals.prototype.action = function action(event) {
+  var internals = this
+  var attributeName = internals.name
+  var matcher = {}
+  var matches = []
+  var delegator = delegate({element: document.body, event: event})
+
+  internals._actions.push([event, matches])
+
+  matcher.match = function (components, cb) {
+    matches.push([components, cb])
+
+    if (!cb) {
+      cb = components
+      components = []
+    }
+
+    if (typeof components == "string") {
+      components = [components]
+    }
+
+    var selectors = components.map(function (component) {
+      if (component[0] == ":") {
+        component = attributeName+component
+      }
+      return hook.createComponentSelector(component, "~=")
+    })
+    selectors.unshift(hook.createComponentSelector(attributeName, "~="))
+
+    delegator.match(selectors, function (e, main) {
+      var instance = storage.get(main) || main
+      var args = [e];
+
+      [].slice.call(arguments, 2).forEach(function (element, i) {
+        var name = components[i]
+        name = name[0] == ":" ? name.substr(1) : name
+        name = camelcase(name)
+        var arg
+
+        if (instance.components.hasOwnProperty(name)) {
+          arg = instance.components[name]
+          if (Array.isArray(arg)) {
+            arg.some(function (member) {
+              if (member == element || member.element == member) {
+                arg = member
+                return true
+              }
+              return false
+            })
+          }
+        }
+        else {
+          arg = storage.get(element, name) || element
+        }
+
+        args.push(arg)
+      })
+
+      return cb.apply(instance, args)
+    })
+
+    return matcher
+  }
+
+  return matcher
+}
+
 Internals.prototype.event = function (type, definition) {
   this._events[type] = definition
   return this
@@ -93,9 +193,17 @@ Internals.prototype.getEventDefinition = function (type, detail) {
 }
 
 Internals.prototype.resetAttributes = function (instance) {
+  if (!instance.element) return
+
+  var attribute
+  var value
   for (var name in this._attributes) {
     if (this._attributes.hasOwnProperty(name)) {
-      this._attributes[name].set.call(instance, instance[name], false)
+      attribute = this._attributes[name]
+      value = attribute.get.call(instance, false)
+      if (attribute.hasDefault && !attribute.has.call(instance, value)) {
+        attribute.set.call(instance, attribute.defaultValue, false)
+      }
     }
   }
 }
@@ -148,13 +256,13 @@ Internals.prototype.attribute = function (name, def) {
 
   var parseValue
   var stringifyValue
-  var shouldRemove
+  var has
 
-  shouldRemove = function (value) { return value == null }
+  has = function (value) { return value != null }
 
   switch (type) {
     case "boolean":
-      shouldRemove = function (value) { return value === false }
+      has = function (value) { return value !== false }
       parseValue = function (value) { return value != null }
       stringifyValue = function () { return "" }
       break
@@ -170,21 +278,24 @@ Internals.prototype.attribute = function (name, def) {
   }
 
   this._attributes[property] = {
-    get: getValue,
-    set: setValue
+    get: get,
+    set: set,
+    has: has,
+    defaultValue: defaultValue,
+    hasDefault: defaultValue != null
   }
 
-  function getValue(useDefault) {
+  function get(useDefault) {
     var value = this.element.getAttribute(name)
-    if (value == null && useDefault != false) {
+    if (value == null && useDefault == true) {
       return defaultValue
     }
     return parseValue ? parseValue(value) : value
   }
 
-  function setValue(value, callOnchange) {
-    var old = getValue.call(this, false)
-    if (shouldRemove(value)) {
+  function set(value, callOnchange) {
+    var old = get.call(this, false)
+    if (!has(value)) {
       this.element.removeAttribute(name)
     }
     else if (old === value) {
@@ -198,8 +309,8 @@ Internals.prototype.attribute = function (name, def) {
   }
 
   Object.defineProperty(master, property, {
-    get: getter || getValue,
-    set: setter || setValue
+    get: getter || get,
+    set: setter || set
   })
 
   return this

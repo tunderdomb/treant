@@ -65,35 +65,18 @@ function Component (element, options) {
   this.element = element || null
   this.components = {}
 
-  if (this.element && this.internals.autoAssign) {
-    this.assignSubComponents()
-  }
-
-  if (this.element) {
-    this.internals.resetAttributes(this)
-  }
+  this.initialize()
 }
 
-Component.create = function (element, options) {
-  var name = hook.getComponentName(element, false)
-
-  if (!name) {
-    console.warn("Unable to create component, this element doesn't have a component attribute", element)
-    return null
-  }
-
+Component.create = function (name, element, options) {
   var ComponentConstructor = null
 
   if (registry.exists(name)) {
-    ComponentConstructor =  registry.get(name)
-  }
-  else if (registry.exists("*")) {
-    ComponentConstructor = registry.get("*")
+    ComponentConstructor = registry.get(name)
   }
   else {
-    console.warn("Missing custom component '%s' for ", name, element,
-        ' Use the Component constructor to create raw components or register a "*" component.')
-    ComponentConstructor = Component
+    console.warn("Missing component definition: ", name)
+    return null
   }
 
   return new ComponentConstructor(element, options)
@@ -102,6 +85,14 @@ Component.create = function (element, options) {
 Component.prototype = {
   internals: new Internals(),
 
+  initialize: function () {
+    if (!this.element) return
+
+    if (this.internals.autoAssign) {
+      this.assignSubComponents()
+    }
+    this.internals.resetAttributes(this)
+  },
   delegate: function (options) {
     options.element = this.element
     options.context = options.context || this
@@ -119,24 +110,19 @@ Component.prototype = {
   findAllComponent: function (name) {
     return hook.findAllComponent(name, this.element)
   },
-  findSubComponents: function (name) {
-    return hook.findSubComponents(name, this.element)
+  findSubComponents: function () {
+    return hook.findSubComponents(this.getMainComponentName(false), this.element)
   },
   getComponentName: function (cc) {
-    return hook.getComponentName(this.element, cc)
+    return hook.getComponentName(this.internals.name, cc)
   },
   getMainComponentName: function (cc) {
-    return hook.getMainComponentName(this.element, cc)
+    return hook.getMainComponentName(this.internals.name, cc)
   },
   getSubComponentName: function (cc) {
-    return hook.getSubComponentName(this.element, cc)
+    return hook.getSubComponentName(this.internals.name, cc)
   },
   clearSubComponents: function () {
-    this.components = {}
-  },
-  assignSubComponents: function (transform) {
-    var hostComponent = this
-    var subComponents = hook.findSubComponents(this.getMainComponentName(false), this.element)
     var internals = this.internals
 
     for (var name in internals.components) {
@@ -149,14 +135,25 @@ Component.prototype = {
         }
       }
     }
+  },
+  assignSubComponents: function (transform) {
+    if (!this.element) return
+
+    var hostComponent = this
+    var subComponents = this.findSubComponents()
+    var internals = this.internals
+
+    this.clearSubComponents()
 
     if (!subComponents.length) {
       return
     }
 
-    if (this.internals.convertSubComponents && (typeof transform == "undefined" || transform === true)) {
-      transform = function (element/*, name*/) {
-        return Component.create(element, hostComponent)
+    if (typeof transform == "undefined" || transform === true) {
+      transform = function (element, name) {
+        return registry.exists(name)
+            ? Component.create(element, hostComponent)
+            : element
       }
     }
 
@@ -174,8 +171,12 @@ Component.prototype = {
 
 },{"./Internals":4,"./delegate":6,"./hook":8,"./registry":10}],4:[function(require,module,exports){
 var camelcase = require("camelcase")
+var extend = require("../util/extend")
 var merge = require("../util/merge")
 var object = require("../util/object")
+var delegate = require("./delegate")
+var storage = require("./storage")
+var hook = require("./hook")
 
 var defaultEventDefinition = {
   detail: null,
@@ -186,19 +187,48 @@ var defaultEventDefinition = {
 
 module.exports = Internals
 
-function Internals (master) {
+function Internals (master, name) {
+  this.name = name
   this.autoAssign = true
-  this.convertSubComponents = false
   this.components = {}
   this._events = {}
   this._constructors = []
   this._attributes = {}
+  this._actions = []
 
-  Object.defineProperty(this, "_master", {
+  Object.defineProperty(this, "_masterConstructor", {
     get: function () {
       return master
     }
   })
+  Object.defineProperty(this, "_master", {
+    get: function () {
+      return master.prototype
+    }
+  })
+}
+
+Internals.prototype.extend = function (ComponentConstructor) {
+  this._masterConstructor.prototype = Object.create(ComponentConstructor.prototype)
+  this._masterConstructor.prototype.constructor = this._masterConstructor
+  var internals = ComponentConstructor.internals
+  this._masterConstructor.prototype.internals = this
+  this._masterConstructor.internals = this
+  if (internals) {
+    this.autoAssign = internals.autoAssign
+    extend(this.components, internals.components)
+    extend(this._events, internals._events)
+    this._constructors = this._constructors.concat(internals._constructors)
+    extend(this._attributes, internals._attributes)
+    internals._actions.forEach(function (args) {
+      var event = args[0]
+      var matches = args[1]
+      var matcher = this.action.call(this, event)
+      matches.forEach(function (args) {
+        matcher.match.apply(matcher, args)
+      })
+    }, this)
+  }
 }
 
 Internals.prototype.onCreate = function (constructor) {
@@ -256,6 +286,73 @@ Internals.prototype.proto = function (prototype) {
   return this
 }
 
+Internals.prototype.action = function action(event) {
+  var internals = this
+  var attributeName = internals.name
+  var matcher = {}
+  var matches = []
+  var delegator = delegate({element: document.body, event: event})
+
+  internals._actions.push([event, matches])
+
+  matcher.match = function (components, cb) {
+    matches.push([components, cb])
+
+    if (!cb) {
+      cb = components
+      components = []
+    }
+
+    if (typeof components == "string") {
+      components = [components]
+    }
+
+    var selectors = components.map(function (component) {
+      if (component[0] == ":") {
+        component = attributeName+component
+      }
+      return hook.createComponentSelector(component, "~=")
+    })
+    selectors.unshift(hook.createComponentSelector(attributeName, "~="))
+
+    delegator.match(selectors, function (e, main) {
+      var instance = storage.get(main) || main
+      var args = [e];
+
+      [].slice.call(arguments, 2).forEach(function (element, i) {
+        var name = components[i]
+        name = name[0] == ":" ? name.substr(1) : name
+        name = camelcase(name)
+        var arg
+
+        if (instance.components.hasOwnProperty(name)) {
+          arg = instance.components[name]
+          if (Array.isArray(arg)) {
+            arg.some(function (member) {
+              if (member == element || member.element == member) {
+                arg = member
+                return true
+              }
+              return false
+            })
+          }
+        }
+        else {
+          arg = storage.get(element, name) || element
+        }
+
+        args.push(arg)
+      })
+
+      return cb.apply(instance, args)
+    })
+
+    return matcher
+  }
+
+  return matcher
+}
+
 Internals.prototype.event = function (type, definition) {
   this._events[type] = definition
   return this
@@ -268,9 +365,17 @@ Internals.prototype.getEventDefinition = function (type, detail) {
 }
 
 Internals.prototype.resetAttributes = function (instance) {
+  if (!instance.element) return
+
+  var attribute
+  var value
   for (var name in this._attributes) {
     if (this._attributes.hasOwnProperty(name)) {
-      this._attributes[name].set.call(instance, instance[name], false)
+      attribute = this._attributes[name]
+      value = attribute.get.call(instance, false)
+      if (attribute.hasDefault && !attribute.has.call(instance, value)) {
+        attribute.set.call(instance, attribute.defaultValue, false)
+      }
     }
   }
 }
@@ -323,13 +428,13 @@ Internals.prototype.attribute = function (name, def) {
 
   var parseValue
   var stringifyValue
-  var shouldRemove
+  var has
 
-  shouldRemove = function (value) { return value == null }
+  has = function (value) { return value != null }
 
   switch (type) {
     case "boolean":
-      shouldRemove = function (value) { return value === false }
+      has = function (value) { return value !== false }
       parseValue = function (value) { return value != null }
       stringifyValue = function () { return "" }
       break
@@ -345,21 +450,24 @@ Internals.prototype.attribute = function (name, def) {
   }
 
   this._attributes[property] = {
-    get: getValue,
-    set: setValue
+    get: get,
+    set: set,
+    has: has,
+    defaultValue: defaultValue,
+    hasDefault: defaultValue != null
   }
 
-  function getValue(useDefault) {
+  function get(useDefault) {
     var value = this.element.getAttribute(name)
-    if (value == null && useDefault != false) {
+    if (value == null && useDefault == true) {
       return defaultValue
     }
     return parseValue ? parseValue(value) : value
   }
 
-  function setValue(value, callOnchange) {
-    var old = getValue.call(this, false)
-    if (shouldRemove(value)) {
+  function set(value, callOnchange) {
+    var old = get.call(this, false)
+    if (!has(value)) {
       this.element.removeAttribute(name)
     }
     else if (old === value) {
@@ -373,64 +481,41 @@ Internals.prototype.attribute = function (name, def) {
   }
 
   Object.defineProperty(master, property, {
-    get: getter || getValue,
-    set: setter || setValue
+    get: getter || get,
+    set: setter || set
   })
 
   return this
 }
 
-},{"../util/merge":13,"../util/object":14,"camelcase":2}],5:[function(require,module,exports){
+},{"../util/extend":12,"../util/merge":13,"../util/object":14,"./delegate":6,"./hook":8,"./storage":11,"camelcase":2}],5:[function(require,module,exports){
 var Component = require("./Component")
 var hook = require("./hook")
 
 module.exports = component
 
 function component (name, root, options) {
-  var element = null
-
-  // component("string")
-  if (typeof name == "string") {
-    // component("string"[, {}])
-    if (!(root instanceof Element)) {
-      options = root
-      root = null
-    }
-    // component("string"[, Element])
-    element = hook.findComponent(name, root)
-  }
-  // component(Element[, {}])
-  else if (name instanceof Element) {
-    element = name
+  // component("string"[, {}])
+  if (!(root instanceof Element)) {
     options = root
     root = null
   }
+  var element = hook.findComponent(name, root)
 
-  return Component.create(element, options)
+  return Component.create(name, element, options)
 }
 
 component.all = function (name, root, options) {
-  var elements = []
-
-  // component("string")
-  if (typeof name == "string") {
-    // component("string"[, {}])
-    if (!(root instanceof Element)) {
-      options = root
-      root = null
-    }
-    // component("string"[, Element])
-    elements = hook.findAllComponent(name, root)
-  }
-  // component(Element[][, {}])
-  else if (Array.isArray(name)) {
-    elements = name
+  // component("string"[, {}])
+  if (!(root instanceof Element)) {
     options = root
     root = null
   }
+  // component("string"[, Element])
+  var elements = hook.findAllComponent(name, root)
 
   return [].map.call(elements, function (element) {
-    return Component.create(element, options)
+    return Component.create(name, element, options)
   })
 }
 
@@ -622,27 +707,33 @@ function setHookAttribute (hook) {
 function createComponentSelector (name, operator) {
   name = name && '"' + name + '"'
   operator = name ? operator || "=" : ""
-  return '[' + COMPONENT_ATTRIBUTE + operator + name + ']'
+  return "[" + COMPONENT_ATTRIBUTE + operator + name + "]"
+}
+
+function compose (name, extra, operator) {
+  return createComponentSelector(name, operator)+extra
+}
+
+function findComposed (selector, root) {
+  return (root || document).querySelector(selector)
+}
+
+function findAllComposed (selector, root) {
+  return (root || document).querySelectorAll(selector)
 }
 
 function findComponent (name, root) {
-  return (root || document).querySelector(createComponentSelector(name))
+  return findComposed(createComponentSelector(name), root)
 }
 
 function findAllComponent (name, root) {
-  return [].slice.call((root || document).querySelectorAll(createComponentSelector(name)))
-}
-
-function findSubComponents (name, root) {
-  var elements = (root || document).querySelectorAll(createComponentSelector(name, "^="))
-  return filter(elements, function (element, componentName, mainComponentName, subComponentName) {
-    return subComponentName && name === mainComponentName
-  })
+  return [].slice.call(findAllComposed(createComponentSelector(name), root))
 }
 
 function getComponentName (element, cc) {
+  if (!element) return ""
   cc = cc == undefined || cc
-  var value = element.getAttribute(COMPONENT_ATTRIBUTE)
+  var value = typeof element == "string" ? element : element.getAttribute(COMPONENT_ATTRIBUTE) || ""
   return cc ? camelcase(value) : value
 }
 
@@ -660,15 +751,28 @@ function getSubComponentName (element, cc) {
   return cc && value ? camelcase(value) : value
 }
 
+function getComponentNameList (element, cc) {
+  return getComponentName(element, cc).split(/\s+/)
+}
+
+function findSubComponents (mainName, root) {
+  var elements = findAllComposed(createComponentSelector(mainName+":", "*="), root)
+  return filter(elements, function (element, componentName) {
+    return getComponentNameList(componentName, false).some(function (name) {
+      return getMainComponentName(name, false) == mainName && getSubComponentName(name)
+    })
+  })
+}
+
 function assignSubComponents (obj, subComponents, transform, assign) {
   return subComponents.reduce(function (obj, element) {
-    var name = getSubComponentName(element)
-    if (name) {
-
+    getComponentNameList(element, false).forEach(function (name) {
+      name = getSubComponentName(name, false)
       element = typeof transform == "function"
-        ? transform(element, name)
-        : element
-
+          // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
+          ? transform(element, name)
+          : element
+      name = camelcase(name)
       if (typeof assign == "function") {
         assign(obj, name, element)
       }
@@ -678,7 +782,7 @@ function assignSubComponents (obj, subComponents, transform, assign) {
       else {
         obj[name] = element
       }
-    }
+    })
     return obj
   }, obj)
 }
@@ -687,7 +791,7 @@ function filter (elements, filter) {
   switch (typeof filter) {
     case "function":
       return [].slice.call(elements).filter(function (element) {
-        return filter(element, getComponentName(element, false), getMainComponentName(element, false), getSubComponentName(element, false))
+        return filter(element, getComponentName(element, false))
       })
       break
     case "string":
@@ -720,15 +824,14 @@ module.exports = function register (name, mixin) {
     internals.create(instance, [options])
   }
 
-  CustomComponent.prototype = Object.create(Component.prototype)
-  CustomComponent.prototype.constructor = CustomComponent
-  var internals = new Internals(CustomComponent.prototype)
+  //CustomComponent.prototype = Object.create(Component.prototype)
+  //CustomComponent.prototype.constructor = CustomComponent
+  var internals = new Internals(CustomComponent, name)
+  internals.extend(Component)
   internals.autoAssign = true
-  CustomComponent.prototype.internals = internals
-  CustomComponent.internals = internals
   mixin.forEach(function (mixin) {
     if (typeof mixin == "function") {
-      mixin.call(CustomComponent.prototype, CustomComponent.prototype, internals)
+      mixin.call(CustomComponent.prototype, internals)
     }
     else {
       internals.proto(mixin)
@@ -761,23 +864,59 @@ var storage = module.exports = {}
 var components = []
 var elements = []
 
-storage.get = function (element) {
-  return components[elements.indexOf(element)]
+function remove (array, element) {
+  var i = array.indexOf(element)
+  if (~i) array.splice(i, 1)
 }
 
+storage.all = function (element) {
+  return components.filter(function (component) {
+    return component.element == element
+  })
+}
+
+storage.get = function (element, componentName) {
+  var ret = null
+
+  components.some(function (component) {
+    if (component.element == element && (componentName ? component.internals.attributeName == componentName : true)) {
+      ret = component
+      return true
+    }
+    return false
+  })
+
+  return ret
+}
 storage.save = function (component) {
-  components.push(component)
-  elements.push(component.element)
+  if (component.element) {
+    if (!~components.indexOf(component))
+      components.push(component)
+    if (!~elements.indexOf(component.element))
+      elements.push(component.element)
+  }
 }
-
 storage.remove = function (component) {
-  var i = component instanceof Element
-      ? elements.indexOf(component)
-      : components.indexOf(component)
+  var element = component instanceof Element
+      ? component
+      : component.element
+  var all = storage.all(element)
 
-  if (~i) {
-    components.splice(i, 1)
-    elements.splice(i, 1)
+  // remove all component for this element
+  if (component instanceof Element) {
+    all.forEach(function (component) {
+      remove(components, component)
+    })
+  }
+  // remove one component
+  else {
+    remove(components, component)
+  }
+
+  // remove element too, if it was its last component
+  // because elements only stored once
+  if (all.length == 1) {
+    remove(elements, element)
   }
 }
 

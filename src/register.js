@@ -17,15 +17,12 @@ module.exports = function register (name, mixin) {
     internals.create(instance, [options])
   }
 
-  CustomComponent.prototype = Object.create(Component.prototype)
-  CustomComponent.prototype.constructor = CustomComponent
-  var internals = new Internals(CustomComponent.prototype)
+  var internals = new Internals(CustomComponent, name)
+  internals.extend(Component)
   internals.autoAssign = true
-  CustomComponent.prototype.internals = internals
-  CustomComponent.internals = internals
   mixin.forEach(function (mixin) {
     if (typeof mixin == "function") {
-      mixin.call(CustomComponent.prototype, CustomComponent.prototype, internals)
+      mixin.call(CustomComponent.prototype, internals)
     }
     else {
       internals.proto(mixin)
@@ -33,5 +30,4 @@ module.exports = function register (name, mixin) {
   })
 
   return registry.set(name, CustomComponent)
-  // define main prototype after registering
 }

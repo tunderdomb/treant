@@ -16,35 +16,18 @@ function Component (element, options) {
   this.element = element || null
   this.components = {}
 
-  if (this.element && this.internals.autoAssign) {
-    this.assignSubComponents()
-  }
-
-  if (this.element) {
-    this.internals.resetAttributes(this)
-  }
+  this.initialize()
 }
 
-Component.create = function (element, options) {
-  var name = hook.getComponentName(element, false)
-
-  if (!name) {
-    console.warn("Unable to create component, this element doesn't have a component attribute", element)
-    return null
-  }
-
+Component.create = function (name, element, options) {
   var ComponentConstructor = null
 
   if (registry.exists(name)) {
-    ComponentConstructor =  registry.get(name)
-  }
-  else if (registry.exists("*")) {
-    ComponentConstructor = registry.get("*")
+    ComponentConstructor = registry.get(name)
   }
   else {
-    console.warn("Missing custom component '%s' for ", name, element,
-        ' Use the Component constructor to create raw components or register a "*" component.')
-    ComponentConstructor = Component
+    console.warn("Missing component definition: ", name)
+    return null
   }
 
   return new ComponentConstructor(element, options)
@@ -53,6 +36,14 @@ Component.create = function (element, options) {
 Component.prototype = {
   internals: new Internals(),
 
+  initialize: function () {
+    if (!this.element) return
+
+    if (this.internals.autoAssign) {
+      this.assignSubComponents()
+    }
+    this.internals.resetAttributes(this)
+  },
   delegate: function (options) {
     options.element = this.element
     options.context = options.context || this
@@ -70,24 +61,19 @@ Component.prototype = {
   findAllComponent: function (name) {
     return hook.findAllComponent(name, this.element)
   },
-  findSubComponents: function (name) {
-    return hook.findSubComponents(name, this.element)
+  findSubComponents: function () {
+    return hook.findSubComponents(this.getMainComponentName(false), this.element)
   },
   getComponentName: function (cc) {
-    return hook.getComponentName(this.element, cc)
+    return hook.getComponentName(this.internals.name, cc)
   },
   getMainComponentName: function (cc) {
-    return hook.getMainComponentName(this.element, cc)
+    return hook.getMainComponentName(this.internals.name, cc)
   },
   getSubComponentName: function (cc) {
-    return hook.getSubComponentName(this.element, cc)
+    return hook.getSubComponentName(this.internals.name, cc)
   },
   clearSubComponents: function () {
-    this.components = {}
-  },
-  assignSubComponents: function (transform) {
-    var hostComponent = this
-    var subComponents = hook.findSubComponents(this.getMainComponentName(false), this.element)
     var internals = this.internals
 
     for (var name in internals.components) {
@@ -100,14 +86,25 @@ Component.prototype = {
         }
       }
     }
+  },
+  assignSubComponents: function (transform) {
+    if (!this.element) return
+
+    var hostComponent = this
+    var subComponents = this.findSubComponents()
+    var internals = this.internals
+
+    this.clearSubComponents()
 
     if (!subComponents.length) {
       return
     }
 
-    if (this.internals.convertSubComponents && (typeof transform == "undefined" || transform === true)) {
-      transform = function (element/*, name*/) {
-        return Component.create(element, hostComponent)
+    if (typeof transform == "undefined" || transform === true) {
+      transform = function (element, name) {
+        return registry.exists(name)
+            ? Component.create(element, hostComponent)
+            : element
       }
     }
 
