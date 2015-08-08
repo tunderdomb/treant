@@ -11,21 +11,28 @@ module.exports = function register (name, mixin) {
     }
     var instance = this
 
+    this.name = name
+
     Component.call(instance, element, options)
     // at this point custom constructors can already access the element and sub components
     // so they only receive the options object for convenience
-    internals.create(instance, [options])
+    CustomComponent.create(instance, [options])
   }
 
-  var internals = new Internals(CustomComponent, name)
-  internals.extend(Component)
-  internals.autoAssign = true
+  Internals(CustomComponent, name)
+  CustomComponent.extend(Component)
+  CustomComponent.autoAssign = true
   mixin.forEach(function (mixin) {
     if (typeof mixin == "function") {
-      mixin.call(CustomComponent.prototype, internals)
+      if (mixin.componentName) {
+        CustomComponent.extend(mixin)
+      }
+      else {
+        mixin.call(CustomComponent.prototype, CustomComponent)
+      }
     }
     else {
-      internals.proto(mixin)
+      CustomComponent.proto(mixin)
     }
   })
 

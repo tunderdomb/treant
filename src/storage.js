@@ -35,7 +35,7 @@ storage.get = function (element, componentName) {
 storage.save = function (component) {
   if (component.element) {
     var id = component._id
-    var componentName = component.internals.name
+    var componentName = component.name
     var store
 
     if (!id) {
@@ -67,7 +67,7 @@ storage.remove = function (component, onlyComponent) {
   var element = component instanceof Element
       ? component
       : component.element
-  var componentName = component.internals.name
+  var componentName = component.name
   var id = getId(element, componentName)
   var store = components[id]
 

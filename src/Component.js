@@ -2,7 +2,6 @@ var hook = require("./hook")
 var registry = require("./registry")
 var storage = require("./storage")
 var delegate = require("./delegate")
-var Internals = require("./Internals")
 
 module.exports = Component
 
@@ -16,10 +15,8 @@ function Component (element, options) {
 
   this._element = null
   this._id = null
-  this.element = element || null
   this.components = {}
-
-  this.initialize()
+  this.element = element || null
 }
 
 Component.create = function (name, element, options) {
@@ -37,16 +34,8 @@ Component.create = function (name, element, options) {
 }
 
 Component.prototype = {
-  internals: new Internals(),
+  constructor: Component,
 
-  initialize: function () {
-    if (!this.element) return
-
-    if (this.internals.autoAssign) {
-      this.assignSubComponents()
-    }
-    this.internals.resetAttributes(this)
-  },
   destroy: function () {
     storage.remove(this)
     this.element = null
@@ -71,7 +60,7 @@ Component.prototype = {
   },
 
   dispatch: function (type, detail) {
-    var definition = this.internals.getEventDefinition(type, detail)
+    var definition = this.constructor.getEventDefinition(type, detail)
     return this.element.dispatchEvent(new window.CustomEvent(type, definition))
   },
 
@@ -85,25 +74,25 @@ Component.prototype = {
     return hook.findSubComponents(this.getMainComponentName(false), this.element)
   },
   getComponentName: function (cc) {
-    return hook.getComponentName(this.internals.name, cc)
+    return hook.getComponentName(this.constructor.componentName, cc)
   },
   getMainComponentName: function (cc) {
-    return hook.getMainComponentName(this.internals.name, cc)
+    return hook.getMainComponentName(this.constructor.componentName, cc)
   },
   getSubComponentName: function (cc) {
-    return hook.getSubComponentName(this.internals.name, cc)
+    return hook.getSubComponentName(this.constructor.componentName, cc)
   },
 
   clearSubComponents: function () {
-    var internals = this.internals
+    var components = this.constructor.components
 
-    for (var name in internals.components) {
-      if (internals.components.hasOwnProperty(name)) {
-        if (Array.isArray(internals.components[name])) {
+    for (var name in components) {
+      if (components.hasOwnProperty(name)) {
+        if (Array.isArray(components[name])) {
           this.components[name] = []
         }
         else {
-          this.components[name] = internals.components[name]
+          this.components[name] = components[name]
         }
       }
     }
@@ -113,7 +102,7 @@ Component.prototype = {
 
     var hostComponent = this
     var subComponents = this.findSubComponents()
-    var internals = this.internals
+    var constructor = this.constructor
 
     this.clearSubComponents()
 
@@ -130,7 +119,7 @@ Component.prototype = {
     }
 
     hook.assignSubComponents(this.components, subComponents, transform, function (components, name, element) {
-      if (Array.isArray(internals.components[name])) {
+      if (Array.isArray(constructor.components[name])) {
         components[name] = components[name] || []
         components[name].push(element)
       }
@@ -147,8 +136,14 @@ Object.defineProperty(Component.prototype, "element", {
   },
   set: function (element) {
     this._element = element
-    if (element && this.internals.name && this.internals.autoSave) {
-      storage.save(this)
+    if (element && this.constructor.componentName) {
+      if (this.constructor.autoSave) {
+        storage.save(this)
+      }
+      if (this.constructor.autoAssign) {
+        this.assignSubComponents()
+      }
+      this.constructor.resetAttributes(this)
     }
   }
 })

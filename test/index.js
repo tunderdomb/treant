@@ -48,7 +48,8 @@ describe("Component()", function () {
 
   describe("prototype.dispatch", function () {
     it("should dispatch a custom event", function () {
-      var component = new treant.Component(pagination)
+      var Pagination = treant.register("pagination")
+      var component = new Pagination(pagination)
       var dispatched = false
       component.element.addEventListener("hello", function (e) {
         dispatched = true
@@ -59,7 +60,8 @@ describe("Component()", function () {
       assert.isTrue(dispatched)
     })
     it("should dispatch a click event", function () {
-      var component = new treant.Component(pagination)
+      var Pagination = treant.register("pagination")
+      var component = new Pagination(pagination)
       var dispatched = false
       component.element.addEventListener("click", function (e) {
         dispatched = true
@@ -70,7 +72,8 @@ describe("Component()", function () {
       assert.isTrue(dispatched)
     })
     it("should carry data", function () {
-      var component = new treant.Component(pagination)
+      var Pagination = treant.register("pagination")
+      var component = new Pagination(pagination)
       var data = {
         hey: "ho"
       }
@@ -84,11 +87,11 @@ describe("Component()", function () {
       assert.equal(data, eventData)
     })
     it("should register an bubbling and non bubbling event definition", function () {
-      var Pagination = treant.register("pagination", function () {
-        this.internals.event("hey", {
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.event("hey", {
           bubbles: true
         })
-        this.internals.event("ho", {
+        internals.event("ho", {
           bubbles: false
         })
       })
@@ -110,12 +113,12 @@ describe("Component()", function () {
       assert.isFalse(ho)
     })
     it("should register a cancellable event definition", function () {
-      var Pagination = treant.register("pagination", function () {
-        this.internals.event("cancellable", {
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.event("cancellable", {
           cancelable: true,
           bubbles: true
         })
-        this.internals.event("notcancellable", {
+        internals.event("notcancellable", {
           cancelable: false,
           bubbles: true
         })
@@ -399,7 +402,7 @@ describe("Internals", function () {
     var Pagination = treant
         .register("pagination")
 
-    Pagination.internals
+    Pagination
         .onCreate(function (options) {})
         .event("close", {})
         .attribute("value", 2)
