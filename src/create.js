@@ -21,7 +21,7 @@ component.all = function (name, root, options) {
     root = null
   }
   // component("string"[, Element])
-  var elements = hook.findAllComponent(name, root)
+  var elements = hook.findAllComponents(name, root)
 
   return [].map.call(elements, function (element) {
     return Component.create(name, element, options)

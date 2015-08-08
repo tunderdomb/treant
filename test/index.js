@@ -320,15 +320,15 @@ describe("storage", function () {
   it("should save and retrieve the component by element", function () {
     var Pagination = treant.register("pagination")
     var p = new Pagination(pagination)
-    treant.storage.save(p)
-    assert.equal(p, treant.storage.get(pagination))
+    //treant.storage.save(p)
+    assert.equal(p, treant.storage.get(pagination, "pagination"))
   })
   it("should save and remove the component by element", function () {
     var Pagination = treant.register("pagination")
     var p = new Pagination(pagination2)
-    treant.storage.save(p)
+    //treant.storage.save(p)
     treant.storage.remove(p)
-    assert.isNull(treant.storage.get(pagination2))
+    assert.isNull(treant.storage.get(pagination2, "pagination"))
   })
 })
 
@@ -628,6 +628,92 @@ describe("Internals", function () {
       assert.equal(testNewValue, newValue)
     })
   })
+
+  describe("action", function () {
+    it("should delegate an event", function () {
+      var called = false
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.components.pageNumber = null
+        internals.action("click").match(":page-number", function (e, pageNumber) {
+          called = true
+        })
+      })
+
+      var component = new Pagination(pagination)
+
+      component.components.pageNumber
+          .dispatchEvent(new window.CustomEvent("click", {bubbles: true}))
+      assert.isTrue(called)
+    })
+    it("should call it with the instance as context", function () {
+      var context
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.components.pageNumber = null
+        internals.action("click").match(":page-number", function (e, pageNumber) {
+          context = this
+        })
+      })
+
+      var component = new Pagination(pagination)
+
+      component.components.pageNumber
+          .dispatchEvent(new window.CustomEvent("click", {bubbles: true}))
+      assert.equal(context, component)
+    })
+    it("should pass requested component", function () {
+      var passedArg
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.components.pageNumber = null
+        internals.action("click").match(":page-number", function (e, pageNumber) {
+          passedArg = pageNumber
+        })
+      })
+
+      var component = new Pagination(pagination)
+
+      component.components.pageNumber
+          .dispatchEvent(new window.CustomEvent("click", {bubbles: true}))
+      assert.equal(passedArg, component.components.pageNumber)
+    })
+    it("should continue with matchers", function () {
+      var continued = false
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.components.pageNumber = null
+        internals
+            .action("click")
+            .match(":page-number", function (e, pageNumber) {})
+            .match(function (e, pageNumber) {
+              continued = true
+            })
+      })
+
+      var component = new Pagination(pagination)
+
+      component.components.pageNumber
+          .dispatchEvent(new window.CustomEvent("click", {bubbles: true}))
+      assert.isTrue(continued)
+    })
+    it("should stop matching if a handler returns false", function () {
+      var continued = false
+      var Pagination = treant.register("pagination", function (internals) {
+        internals.components.pageNumber = null
+        internals
+            .action("click")
+            .match(":page-number", function (e, pageNumber) {
+              return false
+            })
+            .match(function (e) {
+              continued = true
+            })
+      })
+
+      var component = new Pagination(pagination)
+
+      component.components.pageNumber
+          .dispatchEvent(new window.CustomEvent("click", {bubbles: true}))
+      assert.isFalse(continued)
+    })
+  })
 })
 
 describe("hook", function () {
@@ -662,12 +748,12 @@ describe("hook", function () {
   // findAllComponent()
   describe("findAllComponent()", function () {
     it("should find all components in the document", function () {
-      var elements = treant.hook.findAllComponent("pagination", scope2)
+      var elements = treant.hook.findAllComponents("pagination", scope2)
       assert.isArray(elements)
       assert.lengthOf(elements, 4)
     })
     it("should find all components in the given element", function () {
-      var elements = treant.hook.findAllComponent("pagination", scope)
+      var elements = treant.hook.findAllComponents("pagination", scope)
       assert.isArray(elements)
       assert.lengthOf(elements, 1)
     })

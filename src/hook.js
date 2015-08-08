@@ -4,9 +4,9 @@ var COMPONENT_ATTRIBUTE = "data-component"
 var hook = module.exports = {}
 
 hook.setHookAttribute = setHookAttribute
-hook.createComponentSelector = createComponentSelector
+hook.selector = selector
 hook.findComponent = findComponent
-hook.findAllComponent = findAllComponent
+hook.findAllComponents = findAllComponents
 hook.findSubComponents = findSubComponents
 hook.getComponentName = getComponentName
 hook.getMainComponentName = getMainComponentName
@@ -18,30 +18,27 @@ function setHookAttribute (hook) {
   COMPONENT_ATTRIBUTE = hook
 }
 
-function createComponentSelector (name, operator) {
+function selector (name, operator, extra) {
   name = name && '"' + name + '"'
   operator = name ? operator || "=" : ""
-  return "[" + COMPONENT_ATTRIBUTE + operator + name + "]"
+  extra = extra || ""
+  return "[" + COMPONENT_ATTRIBUTE + operator + name + "]" + extra
 }
 
-function compose (name, extra, operator) {
-  return createComponentSelector(name, operator)+extra
-}
-
-function findComposed (selector, root) {
+function find (selector, root) {
   return (root || document).querySelector(selector)
 }
 
-function findAllComposed (selector, root) {
+function findAll (selector, root) {
   return (root || document).querySelectorAll(selector)
 }
 
 function findComponent (name, root) {
-  return findComposed(createComponentSelector(name), root)
+  return find(selector(name), root)
 }
 
-function findAllComponent (name, root) {
-  return [].slice.call(findAllComposed(createComponentSelector(name), root))
+function findAllComponents (name, root) {
+  return [].slice.call(findAll(selector(name), root))
 }
 
 function getComponentName (element, cc) {
@@ -70,7 +67,7 @@ function getComponentNameList (element, cc) {
 }
 
 function findSubComponents (mainName, root) {
-  var elements = findAllComposed(createComponentSelector(mainName+":", "*="), root)
+  var elements = findAll(selector(mainName+":", "*="), root)
   return filter(elements, function (element, componentName) {
     return getComponentNameList(componentName, false).some(function (name) {
       return getMainComponentName(name, false) == mainName && getSubComponentName(name)

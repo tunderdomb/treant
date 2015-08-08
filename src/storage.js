@@ -1,60 +1,102 @@
+var hook = require("./hook")
+var camelcase = require("camelcase")
+
 var storage = module.exports = {}
 var components = []
 var elements = []
+var counter = 0
 
-function remove (array, element) {
-  var i = array.indexOf(element)
-  if (~i) array.splice(i, 1)
+function createProperty (componentName) {
+  return camelcase(componentName+"-id")
 }
 
-storage.all = function (element) {
-  return components.filter(function (component) {
-    return component.element == element
-  })
+function getId (element, componentName) {
+  return element.dataset[createProperty(componentName)]
+}
+
+function setId (element, componentName, id) {
+  element.dataset[createProperty(componentName)] = id
+}
+
+function hasId (element, componentName) {
+  return !!(element.dataset[createProperty(componentName)])
+}
+
+function removeId (element, componentName) {
+  if (hasId(element, componentName)) {
+    delete element.dataset[createProperty(componentName)]
+  }
 }
 
 storage.get = function (element, componentName) {
-  var ret = null
-
-  components.some(function (component) {
-    if (component.element == element && (componentName ? component.internals.name == componentName : true)) {
-      ret = component
-      return true
-    }
-    return false
-  })
-
-  return ret
+  var store = components[getId(element, componentName)]
+  return store ? store[componentName] : null
 }
 storage.save = function (component) {
   if (component.element) {
-    if (!~components.indexOf(component))
-      components.push(component)
-    if (!~elements.indexOf(component.element))
-      elements.push(component.element)
+    var id = component._id
+    var componentName = component.internals.name
+    var store
+
+    if (!id) {
+      id = ++counter
+      setId(component.element, componentName, id)
+      component._id = id
+    }
+
+    store = components[id]
+    if (!store) {
+      store = components[id] = {length: 0}
+    }
+
+    if (store[componentName] !== component) {
+      ++store.length
+      store[componentName] = component
+    }
+
+    var existingElement = elements[id]
+    if (existingElement) {
+      removeId(existingElement, componentName)
+      setId(component.element, componentName, id)
+    }
+
+    elements[id] = component.element
   }
 }
-storage.remove = function (component) {
+storage.remove = function (component, onlyComponent) {
   var element = component instanceof Element
       ? component
       : component.element
-  var all = storage.all(element)
+  var componentName = component.internals.name
+  var id = getId(element, componentName)
+  var store = components[id]
 
-  // remove all component for this element
   if (component instanceof Element) {
-    all.forEach(function (component) {
-      remove(components, component)
-    })
+    if (onlyComponent) {
+      if (delete store[onlyComponent]) --store.length
+    }
+    else {
+      for (var prop in store) {
+        if (store.hasOwnProperty(id)) {
+          store[prop]._id = null
+          //--store.length
+        }
+      }
+      delete components[id]
+    }
   }
-  // remove one component
   else {
-    remove(components, component)
+    var existing = store[componentName]
+    if (existing == component) {
+      existing._id = null
+      delete store[componentName]
+      --store.length
+    }
   }
 
-  // remove element too, if it was its last component
-  // because elements only stored once
-  if (all.length == 1) {
-    remove(elements, element)
+  if (store && !store.length) {
+    removeId(elements[id], componentName)
+    delete elements[id]
   }
 }
 

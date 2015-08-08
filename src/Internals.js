@@ -18,6 +18,7 @@ module.exports = Internals
 function Internals (master, name) {
   this.name = name
   this.autoAssign = true
+  this.autoSave = true
   this.components = {}
   this._events = {}
   this._constructors = []
@@ -139,22 +140,22 @@ Internals.prototype.action = function action(event) {
       if (component[0] == ":") {
         component = attributeName+component
       }
-      return hook.createComponentSelector(component, "~=")
+      return hook.selector(component, "~=")
     })
-    selectors.unshift(hook.createComponentSelector(attributeName, "~="))
+    selectors.unshift(hook.selector(attributeName, "~="))
 
     delegator.match(selectors, function (e, main) {
-      var instance = storage.get(main) || main
+      var instance = storage.get(main, internals.name) || main
       var args = [e];
 
       [].slice.call(arguments, 2).forEach(function (element, i) {
         var name = components[i]
         name = name[0] == ":" ? name.substr(1) : name
-        name = camelcase(name)
+        var propertyName = camelcase(name)
         var arg
 
-        if (instance.components.hasOwnProperty(name)) {
-          arg = instance.components[name]
+        if (instance.components.hasOwnProperty(propertyName)) {
+          arg = instance.components[propertyName]
           if (Array.isArray(arg)) {
             arg.some(function (member) {
               if (member == element || member.element == element) {

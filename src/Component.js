@@ -1,5 +1,6 @@
 var hook = require("./hook")
 var registry = require("./registry")
+var storage = require("./storage")
 var delegate = require("./delegate")
 var Internals = require("./Internals")
 
@@ -13,6 +14,8 @@ function Component (element, options) {
     return new Component(element, options)
   }
 
+  this._element = null
+  this._id = null
   this.element = element || null
   this.components = {}
 
@@ -44,6 +47,23 @@ Component.prototype = {
     }
     this.internals.resetAttributes(this)
   },
+  destroy: function () {
+    storage.remove(this)
+    this.element = null
+
+    var components = this.components
+    var component
+    for (var name in components) {
+      if (components.hasOwnProperty(name)) {
+        component = components[name]
+        if (component.destroy) {
+          component.destroy()
+        }
+      }
+    }
+    this.components = null
+  },
+
   delegate: function (options) {
     options.element = this.element
     options.context = options.context || this
@@ -58,8 +78,8 @@ Component.prototype = {
   findComponent: function (name) {
     return hook.findComponent(name, this.element)
   },
-  findAllComponent: function (name) {
-    return hook.findAllComponent(name, this.element)
+  findAllComponents: function (name) {
+    return hook.findAllComponents(name, this.element)
   },
   findSubComponents: function () {
     return hook.findSubComponents(this.getMainComponentName(false), this.element)
@@ -73,6 +93,7 @@ Component.prototype = {
   getSubComponentName: function (cc) {
     return hook.getSubComponentName(this.internals.name, cc)
   },
+
   clearSubComponents: function () {
     var internals = this.internals
 
@@ -119,3 +140,15 @@ Component.prototype = {
     })
   }
 }
+
+Object.defineProperty(Component.prototype, "element", {
+  get: function () {
+    return this._element
+  },
+  set: function (element) {
+    this._element = element
+    if (element && this.internals.name && this.internals.autoSave) {
+      storage.save(this)
+    }
+  }
+})

@@ -49,6 +49,7 @@ module.exports = function (str) {
 },{}],3:[function(require,module,exports){
 var hook = require("./hook")
 var registry = require("./registry")
+var storage = require("./storage")
 var delegate = require("./delegate")
 var Internals = require("./Internals")
 
@@ -62,6 +63,8 @@ function Component (element, options) {
     return new Component(element, options)
   }
 
+  this._element = null
+  this._id = null
   this.element = element || null
   this.components = {}
 
@@ -93,6 +96,23 @@ Component.prototype = {
     }
     this.internals.resetAttributes(this)
   },
+  destroy: function () {
+    storage.remove(this)
+    this.element = null
+
+    var components = this.components
+    var component
+    for (var name in components) {
+      if (components.hasOwnProperty(name)) {
+        component = components[name]
+        if (component.destroy) {
+          component.destroy()
+        }
+      }
+    }
+    this.components = null
+  },
+
   delegate: function (options) {
     options.element = this.element
     options.context = options.context || this
@@ -107,8 +127,8 @@ Component.prototype = {
   findComponent: function (name) {
     return hook.findComponent(name, this.element)
   },
-  findAllComponent: function (name) {
-    return hook.findAllComponent(name, this.element)
+  findAllComponents: function (name) {
+    return hook.findAllComponents(name, this.element)
   },
   findSubComponents: function () {
     return hook.findSubComponents(this.getMainComponentName(false), this.element)
@@ -122,6 +142,7 @@ Component.prototype = {
   getSubComponentName: function (cc) {
     return hook.getSubComponentName(this.internals.name, cc)
   },
+
   clearSubComponents: function () {
     var internals = this.internals
 
@@ -169,7 +190,17 @@ Component.prototype = {
   }
 }
 
-},{"./Internals":4,"./delegate":6,"./hook":8,"./registry":10}],4:[function(require,module,exports){
+Object.defineProperty(Component.prototype, "element", {
+  get: function () {
+    return this._element
+  },
+  set: function (element) {
+    this._element = element
+    if (element && this.internals.name) storage.save(this)
+  }
+})
+
+},{"./Internals":4,"./delegate":6,"./hook":8,"./registry":10,"./storage":11}],4:[function(require,module,exports){
 var camelcase = require("camelcase")
 var extend = require("../util/extend")
 var merge = require("../util/merge")
@@ -311,25 +342,25 @@ Internals.prototype.action = function action(event) {
       if (component[0] == ":") {
         component = attributeName+component
       }
-      return hook.createComponentSelector(component, "~=")
+      return hook.selector(component, "~=")
     })
-    selectors.unshift(hook.createComponentSelector(attributeName, "~="))
+    selectors.unshift(hook.selector(attributeName, "~="))
 
     delegator.match(selectors, function (e, main) {
-      var instance = storage.get(main) || main
+      var instance = storage.get(main, internals.name) || main
       var args = [e];
 
       [].slice.call(arguments, 2).forEach(function (element, i) {
         var name = components[i]
         name = name[0] == ":" ? name.substr(1) : name
-        name = camelcase(name)
+        var propertyName = camelcase(name)
         var arg
 
-        if (instance.components.hasOwnProperty(name)) {
-          arg = instance.components[name]
+        if (instance.components.hasOwnProperty(propertyName)) {
+          arg = instance.components[propertyName]
           if (Array.isArray(arg)) {
             arg.some(function (member) {
-              if (member == element || member.element == member) {
+              if (member == element || member.element == element) {
                 arg = member
                 return true
               }
@@ -512,7 +543,7 @@ component.all = function (name, root, options) {
     root = null
   }
   // component("string"[, Element])
-  var elements = hook.findAllComponent(name, root)
+  var elements = hook.findAllComponents(name, root)
 
   return [].map.call(elements, function (element) {
     return Component.create(name, element, options)
@@ -690,9 +721,9 @@ var COMPONENT_ATTRIBUTE = "data-component"
 var hook = module.exports = {}
 
 hook.setHookAttribute = setHookAttribute
-hook.createComponentSelector = createComponentSelector
+hook.selector = selector
 hook.findComponent = findComponent
-hook.findAllComponent = findAllComponent
+hook.findAllComponents = findAllComponents
 hook.findSubComponents = findSubComponents
 hook.getComponentName = getComponentName
 hook.getMainComponentName = getMainComponentName
@@ -704,30 +735,27 @@ function setHookAttribute (hook) {
   COMPONENT_ATTRIBUTE = hook
 }
 
-function createComponentSelector (name, operator) {
+function selector (name, operator, extra) {
   name = name && '"' + name + '"'
   operator = name ? operator || "=" : ""
-  return "[" + COMPONENT_ATTRIBUTE + operator + name + "]"
+  extra = extra || ""
+  return "[" + COMPONENT_ATTRIBUTE + operator + name + "]" + extra
 }
 
-function compose (name, extra, operator) {
-  return createComponentSelector(name, operator)+extra
-}
-
-function findComposed (selector, root) {
+function find (selector, root) {
   return (root || document).querySelector(selector)
 }
 
-function findAllComposed (selector, root) {
+function findAll (selector, root) {
   return (root || document).querySelectorAll(selector)
 }
 
 function findComponent (name, root) {
-  return findComposed(createComponentSelector(name), root)
+  return find(selector(name), root)
 }
 
-function findAllComponent (name, root) {
-  return [].slice.call(findAllComposed(createComponentSelector(name), root))
+function findAllComponents (name, root) {
+  return [].slice.call(findAll(selector(name), root))
 }
 
 function getComponentName (element, cc) {
@@ -756,7 +784,7 @@ function getComponentNameList (element, cc) {
 }
 
 function findSubComponents (mainName, root) {
-  var elements = findAllComposed(createComponentSelector(mainName+":", "*="), root)
+  var elements = findAll(selector(mainName+":", "*="), root)
   return filter(elements, function (element, componentName) {
     return getComponentNameList(componentName, false).some(function (name) {
       return getMainComponentName(name, false) == mainName && getSubComponentName(name)
@@ -856,68 +884,116 @@ registry.set = function exists (name, ComponentConstructor) {
 }
 
 },{}],11:[function(require,module,exports){
+var hook = require("./hook")
+var camelcase = require("camelcase")
+
 var storage = module.exports = {}
 var components = []
 var elements = []
+var counter = 0
 
 function remove (array, element) {
   var i = array.indexOf(element)
   if (~i) array.splice(i, 1)
 }
 
-storage.all = function (element) {
-  return components.filter(function (component) {
-    return component.element == element
-  })
+function createProperty (componentName) {
+  return camelcase(componentName+"-id")
+}
+
+function getId (element, componentName) {
+  return element.dataset[createProperty(componentName)]
+}
+
+function setId (element, componentName, id) {
+  element.dataset[createProperty(componentName)] = id
+}
+
+function hasId (element, componentName) {
+  return !!(element.dataset[createProperty(componentName)])
+}
+
+function removeId (element, componentName) {
+  if (hasId(element, componentName)) {
+    delete element.dataset[createProperty(componentName)]
+  }
 }
 
 storage.get = function (element, componentName) {
-  var ret = null
-
-  components.some(function (component) {
-    if (component.element == element && (componentName ? component.internals.name == componentName : true)) {
-      ret = component
-      return true
-    }
-    return false
-  })
-
-  return ret
+  //componentName = componentName || hook.getComponentName(element, false)
+  var store = components[getId(element, componentName)]
+  return store ? store[componentName] : null
 }
 storage.save = function (component) {
   if (component.element) {
-    if (!~components.indexOf(component))
-      components.push(component)
-    if (!~elements.indexOf(component.element))
-      elements.push(component.element)
+    var id = component._id
+    var componentName = component.internals.name
+    var store
+
+    if (!id) {
+      id = ++counter
+      setId(component.element, componentName, id)
+      component._id = id
+    }
+
+    store = components[id]
+    if (!store) {
+      store = components[id] = {length: 0}
+    }
+
+    if (store[componentName] !== component) {
+      ++store.length
+      store[componentName] = component
+    }
+
+    var existingElement = elements[id]
+    if (existingElement) {
+      removeId(existingElement, componentName)
+      setId(component.element, componentName, id)
+    }
+
+    elements[id] = component.element
   }
 }
-storage.remove = function (component) {
+storage.remove = function (component, onlyComponent) {
   var element = component instanceof Element
       ? component
       : component.element
-  var all = storage.all(element)
+  var componentName = component.internals.name
+  var id = getId(element, componentName)
+  var store = components[id]
 
-  // remove all component for this element
   if (component instanceof Element) {
-    all.forEach(function (component) {
-      remove(components, component)
-    })
+    if (onlyComponent) {
+      if (delete store[onlyComponent]) --store.length
+    }
+    else {
+      for (var prop in store) {
+        if (store.hasOwnProperty(id)) {
+          store[prop]._id = null
+          //--store.length
+        }
+      }
+      delete components[id]
+    }
   }
-  // remove one component
   else {
-    remove(components, component)
+    var existing = store[componentName]
+    if (existing == component) {
+      existing._id = null
+      delete store[componentName]
+      --store.length
+    }
   }
 
-  // remove element too, if it was its last component
-  // because elements only stored once
-  if (all.length == 1) {
-    remove(elements, element)
+  if (store && !store.length) {
+    removeId(elements[id], componentName)
+    delete elements[id]
   }
 }
 
 
-},{}],12:[function(require,module,exports){
+},{"./hook":8,"camelcase":2}],12:[function(require,module,exports){
 module.exports = function extend( obj, extension ){
   for( var name in extension ){
     if( extension.hasOwnProperty(name) ) obj[name] = extension[name]
