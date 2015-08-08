@@ -103,7 +103,7 @@ Component.prototype = {
     if (typeof transform == "undefined" || transform === true) {
       transform = function (element, name) {
         return registry.exists(name)
-            ? Component.create(element, hostComponent)
+            ? Component.create(name, element, hostComponent)
             : element
       }
     }

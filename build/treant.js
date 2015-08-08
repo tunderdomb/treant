@@ -152,7 +152,7 @@ Component.prototype = {
     if (typeof transform == "undefined" || transform === true) {
       transform = function (element, name) {
         return registry.exists(name)
-            ? Component.create(element, hostComponent)
+            ? Component.create(name, element, hostComponent)
             : element
       }
     }
@@ -767,20 +767,19 @@ function findSubComponents (mainName, root) {
 function assignSubComponents (obj, subComponents, transform, assign) {
   return subComponents.reduce(function (obj, element) {
     getComponentNameList(element, false).forEach(function (name) {
-      name = getSubComponentName(name, false)
+      var subName = getSubComponentName(name, true)
       element = typeof transform == "function"
           // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
           ? transform(element, name)
           : element
-      name = camelcase(name)
       if (typeof assign == "function") {
-        assign(obj, name, element)
+        assign(obj, subName, element)
       }
-      else if (Array.isArray(obj[name])) {
-        obj[name].push(element)
+      else if (Array.isArray(obj[subName])) {
+        obj[subName].push(element)
       }
       else {
-        obj[name] = element
+        obj[subName] = element
       }
     })
     return obj
@@ -824,8 +823,6 @@ module.exports = function register (name, mixin) {
     internals.create(instance, [options])
   }
 
-  //CustomComponent.prototype = Object.create(Component.prototype)
-  //CustomComponent.prototype.constructor = CustomComponent
   var internals = new Internals(CustomComponent, name)
   internals.extend(Component)
   internals.autoAssign = true
@@ -839,7 +836,6 @@ module.exports = function register (name, mixin) {
   })
 
   return registry.set(name, CustomComponent)
-  // define main prototype after registering
 }
 
 },{"./Component":3,"./Internals":4,"./registry":10}],10:[function(require,module,exports){
@@ -879,7 +875,7 @@ storage.get = function (element, componentName) {
   var ret = null
 
   components.some(function (component) {
-    if (component.element == element && (componentName ? component.internals.attributeName == componentName : true)) {
+    if (component.element == element && (componentName ? component.internals.name == componentName : true)) {
       ret = component
       return true
     }

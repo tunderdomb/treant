@@ -81,20 +81,19 @@ function findSubComponents (mainName, root) {
 function assignSubComponents (obj, subComponents, transform, assign) {
   return subComponents.reduce(function (obj, element) {
     getComponentNameList(element, false).forEach(function (name) {
-      name = getSubComponentName(name, false)
+      var subName = getSubComponentName(name, true)
       element = typeof transform == "function"
           // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
           ? transform(element, name)
           : element
-      name = camelcase(name)
       if (typeof assign == "function") {
-        assign(obj, name, element)
+        assign(obj, subName, element)
       }
-      else if (Array.isArray(obj[name])) {
-        obj[name].push(element)
+      else if (Array.isArray(obj[subName])) {
+        obj[subName].push(element)
       }
       else {
-        obj[name] = element
+        obj[subName] = element
       }
     })
     return obj

@@ -157,7 +157,7 @@ Internals.prototype.action = function action(event) {
           arg = instance.components[name]
           if (Array.isArray(arg)) {
             arg.some(function (member) {
-              if (member == element || member.element == member) {
+              if (member == element || member.element == element) {
                 arg = member
                 return true
               }
