@@ -58,6 +58,9 @@ Component.prototype = {
     options.context = options.context || this
     return delegate(options)
   },
+  action: function (event) {
+    return this.constructor.createAction(event)
+  },
 
   dispatch: function (type, detail) {
     var definition = this.constructor.getEventDefinition(type, detail)

@@ -110,14 +110,24 @@ module.exports = function (CustomComponent, componentName) {
   }
 
   CustomComponent.action = function action(event) {
-    var matcher = {}
     var matches = []
-    var delegator = delegate({element: document.body, event: event})
+    var action = CustomComponent.createAction(event)
+    var match = action.match
 
     _actions.push([event, matches])
 
-    matcher.match = function (components, cb) {
+    action.match = function (components, cb) {
       matches.push([components, cb])
+      return match(components, cb)
+    }
+
+    return action
+  }
+
+  CustomComponent.createAction = function (event) {
+    var delegator = delegate({element: window, event: event})
+    var action = {}
+    action.match = function (components, cb) {
 
       if (!cb) {
         cb = components
@@ -138,6 +148,7 @@ module.exports = function (CustomComponent, componentName) {
 
       delegator.match(selectors, function (e, main) {
         var instance = storage.get(main, componentName) || main
+        var instanceComponents = instance.components
         var args = [e];
 
         [].slice.call(arguments, 2).forEach(function (element, i) {
@@ -146,7 +157,7 @@ module.exports = function (CustomComponent, componentName) {
           var propertyName = camelcase(name)
           var arg
 
-          if (instance.components.hasOwnProperty(propertyName)) {
+          if (instanceComponents && instanceComponents.hasOwnProperty(propertyName)) {
             arg = instance.components[propertyName]
             if (Array.isArray(arg)) {
               arg.some(function (member) {
@@ -168,10 +179,9 @@ module.exports = function (CustomComponent, componentName) {
         return cb.apply(instance, args)
       })
 
-      return matcher
+      return action
     }
-
-    return matcher
+    return action
   }
 
   CustomComponent.event = function (type, definition) {

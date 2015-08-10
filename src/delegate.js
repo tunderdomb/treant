@@ -104,7 +104,7 @@ function findParent( selector, el, e ){
     switch( typeof selector ){
         case "string":
             while( target && target != el ){
-                if( target.matches(selector) ) return target
+                if( target.matches && target.matches(selector) ) return target
                 target = target.parentNode
             }
             break
