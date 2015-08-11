@@ -80,7 +80,6 @@ function assignSubComponents (obj, subComponents, transform, assign) {
     getComponentNameList(element, false).forEach(function (name) {
       var subName = getSubComponentName(name, true)
       element = typeof transform == "function"
-          // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
           ? transform(element, name)
           : element
       if (typeof assign == "function") {

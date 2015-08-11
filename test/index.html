@@ -46,6 +46,18 @@
 
 <div data-component="pagination" id="pagination6"></div>
 
+<div data-component="base" id="base">
+    <div data-component="base:title"></div>
+    <button data-component="base:button"></button>
+</div>
+
+<div data-component="extended" id="extended" base-attribute>
+    <div data-component="extended:title"></div>
+    <button data-component="base:button"></button>
+    <button data-component="extended:button"></button>
+    <div data-component="extended:extra"></div>
+</div>
+
 
 <script type="text/javascript" src="../build/treant.debug.js"></script>
 <script type="text/javascript" src="../node_modules/mocha/mocha.js"></script>

@@ -20,9 +20,10 @@ module.exports = function (CustomComponent, componentName) {
   CustomComponent.autoAssign = true
   CustomComponent.autoSave = true
   CustomComponent.components = {}
-  
+  CustomComponent.parents = []
+
   var prototype = CustomComponent.prototype
-  
+
   var _events = CustomComponent._events = {}
   var _constructors = CustomComponent._constructors = []
   var _attributes = CustomComponent._attributes = {}
@@ -32,6 +33,8 @@ module.exports = function (CustomComponent, componentName) {
     prototype = CustomComponent.prototype = Object.create(BaseComponent.prototype)
     CustomComponent.prototype.constructor = CustomComponent
     if (BaseComponent.componentName) {
+      CustomComponent.parents = CustomComponent.parents.concat(BaseComponent.parents)
+      CustomComponent.parents.push(BaseComponent)
       CustomComponent.autoAssign = BaseComponent.autoAssign
       extend(CustomComponent.components, BaseComponent.components)
       extend(_events, BaseComponent._events)
@@ -74,7 +77,7 @@ module.exports = function (CustomComponent, componentName) {
   }
 
   CustomComponent.set = function (name, fn) {
-    object.defineGetter(prototype, name, fn)
+    object.defineSetter(prototype, name, fn)
     return CustomComponent
   }
 

@@ -74,6 +74,14 @@ Component.prototype = {
     return hook.findAllComponents(name, this.element)
   },
   findSubComponents: function () {
+    //var subComponents = []
+    //var element = this.element
+    //this.constructor.parents.forEach(function (ParentComponent) {
+    //  var components = hook.findSubComponents(ParentComponent.componentName, element)
+    //  subComponents = subComponents.concat(components)
+    //})
+    //subComponents = subComponents.concat(hook.findSubComponents(this.getMainComponentName(false), element))
+    //return subComponents
     return hook.findSubComponents(this.getMainComponentName(false), this.element)
   },
   getComponentName: function (cc) {
@@ -115,6 +123,7 @@ Component.prototype = {
 
     if (typeof transform == "undefined" || transform === true) {
       transform = function (element, name) {
+        // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
         return registry.exists(name)
             ? Component.create(name, element, hostComponent)
             : element

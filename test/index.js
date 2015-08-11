@@ -12,6 +12,8 @@ var pagination3 = document.getElementById("pagination3")
 var pagination4 = document.getElementById("pagination4")
 var pagination5 = document.getElementById("pagination5")
 var pagination6 = document.getElementById("pagination6")
+var base = document.getElementById("base")
+var extended = document.getElementById("extended")
 var scope = document.getElementById("scope")
 var scope2 = document.getElementById("scope2")
 var customAttribute = document.getElementById("custom-attribute")
@@ -715,6 +717,123 @@ describe("Internals", function () {
       component.components.pageNumber
           .dispatchEvent(new window.CustomEvent("click", {bubbles: true}))
       assert.isFalse(continued)
+    })
+  })
+
+  describe("extend", function () {
+    it("should be an instance of the base component", function () {
+      var Base = treant.register("base")
+      var Extended = treant.register("extended", Base)
+
+      var base = new Base(base)
+      var extended = new Extended(extended)
+
+      assert.instanceOf(extended, Base)
+    })
+    it("should be inherit components", function () {
+      var Base = treant.register("base", function (Base) {
+        Base.components.title = null
+        Base.components.button = []
+      })
+      var Extended = treant.register("extended", Base, function (Extended) {
+        Extended.components.extra = null
+      })
+
+      var b = new Base(base)
+      var e = new Extended(extended)
+
+      assert.isDefined(Extended.components.title)
+      assert.isDefined(Extended.components.button)
+      assert.isArray(Extended.components.button)
+      assert.isDefined(e.components.title)
+      assert.isDefined(e.components.button)
+      assert.isArray(e.components.button)
+    })
+    it("should ignore base-named sub component", function () {
+      var Base = treant.register("base", function (Base) {
+        Base.components.title = null
+        Base.components.button = []
+      })
+      var Extended = treant.register("extended", Base, function (Extended) {
+        Extended.components.extra = null
+      })
+
+      var b = new Base(base)
+      var e = new Extended(extended)
+      assert.lengthOf(e.components.button, 1)
+    })
+    it("should inherit prototype", function () {
+      function test () {}
+      var Base = treant.register("base", {
+        test: test
+      }, function (Base) {
+        Base.get("zero", function () {
+          return 0
+        })
+        Base.set("number", function (number) {
+          return this._number = number
+        })
+      })
+      var Extended = treant.register("extended", Base)
+
+      var b = new Base(base)
+      var e = new Extended(extended)
+
+      assert.equal(e.test, b.test)
+      assert.equal(e.zero, 0)
+      e.number = 2
+      assert.equal(e._number, 2)
+    })
+    it("should inherit constructors", function () {
+      var Base = treant.register("base", function (Base) {
+        Base.onCreate(function () {
+          this.hey = "ho"
+        })
+      })
+      var Extended = treant.register("extended", Base, function (Extended) {
+        Extended.onCreate(function () {
+          this.lets = "go"
+        })
+      })
+
+      var b = new Base(base)
+      var e = new Extended(extended)
+
+      assert.equal(e.hey, "ho")
+      assert.equal(e.lets, "go")
+    })
+    it("should inherit attributes", function () {
+      var Base = treant.register("base", function (Base) {
+        Base.attribute("base-attribute", false)
+      })
+      var Extended = treant.register("extended", Base)
+
+      var b = new Base(base)
+      var e = new Extended(extended)
+
+      assert.equal(e.baseAttribute, true)
+      e.baseAttribute = false
+      assert.equal(e.baseAttribute, false)
+    })
+    it("should inherit actions", function () {
+      var called = false
+      var passedComponent = null
+
+      var Base = treant.register("base", function (Base) {
+        Base.action("hey").match(":button", function (e, button) {
+          called = true
+          passedComponent = button
+        })
+      })
+      var Extended = treant.register("extended", Base)
+
+      var b = new Base(base)
+      var e = new Extended(extended)
+
+      e.components.button.dispatchEvent(new window.CustomEvent("hey", {bubbles: true}))
+
+      assert.isTrue(called)
+      assert.equal(passedComponent, e.components.button)
     })
   })
 })

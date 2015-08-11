@@ -107,6 +107,9 @@ Component.prototype = {
     options.context = options.context || this
     return delegate(options)
   },
+  action: function (event) {
+    return this.constructor.createAction(event)
+  },
 
   dispatch: function (type, detail) {
     var definition = this.constructor.getEventDefinition(type, detail)
@@ -120,6 +123,14 @@ Component.prototype = {
     return hook.findAllComponents(name, this.element)
   },
   findSubComponents: function () {
+    //var subComponents = []
+    //var element = this.element
+    //this.constructor.parents.forEach(function (ParentComponent) {
+    //  var components = hook.findSubComponents(ParentComponent.componentName, element)
+    //  subComponents = subComponents.concat(components)
+    //})
+    //subComponents = subComponents.concat(hook.findSubComponents(this.getMainComponentName(false), element))
+    //return subComponents
     return hook.findSubComponents(this.getMainComponentName(false), this.element)
   },
   getComponentName: function (cc) {
@@ -161,6 +172,7 @@ Component.prototype = {
 
     if (typeof transform == "undefined" || transform === true) {
       transform = function (element, name) {
+        // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
         return registry.exists(name)
             ? Component.create(name, element, hostComponent)
             : element
@@ -220,9 +232,10 @@ module.exports = function (CustomComponent, componentName) {
   CustomComponent.autoAssign = true
   CustomComponent.autoSave = true
   CustomComponent.components = {}
-  
+  CustomComponent.parents = []
+
   var prototype = CustomComponent.prototype
-  
+
   var _events = CustomComponent._events = {}
   var _constructors = CustomComponent._constructors = []
   var _attributes = CustomComponent._attributes = {}
@@ -232,6 +245,8 @@ module.exports = function (CustomComponent, componentName) {
     prototype = CustomComponent.prototype = Object.create(BaseComponent.prototype)
     CustomComponent.prototype.constructor = CustomComponent
     if (BaseComponent.componentName) {
+      CustomComponent.parents = CustomComponent.parents.concat(BaseComponent.parents)
+      CustomComponent.parents.push(BaseComponent)
       CustomComponent.autoAssign = BaseComponent.autoAssign
       extend(CustomComponent.components, BaseComponent.components)
       extend(_events, BaseComponent._events)
@@ -274,7 +289,7 @@ module.exports = function (CustomComponent, componentName) {
   }
 
   CustomComponent.set = function (name, fn) {
-    object.defineGetter(prototype, name, fn)
+    object.defineSetter(prototype, name, fn)
     return CustomComponent
   }
 
@@ -310,14 +325,24 @@ module.exports = function (CustomComponent, componentName) {
   }
 
   CustomComponent.action = function action(event) {
-    var matcher = {}
     var matches = []
-    var delegator = delegate({element: document.body, event: event})
+    var action = CustomComponent.createAction(event)
+    var match = action.match
 
     _actions.push([event, matches])
 
-    matcher.match = function (components, cb) {
+    action.match = function (components, cb) {
       matches.push([components, cb])
+      return match(components, cb)
+    }
+
+    return action
+  }
+
+  CustomComponent.createAction = function (event) {
+    var delegator = delegate({element: window, event: event})
+    var action = {}
+    action.match = function (components, cb) {
 
       if (!cb) {
         cb = components
@@ -338,6 +363,7 @@ module.exports = function (CustomComponent, componentName) {
 
       delegator.match(selectors, function (e, main) {
         var instance = storage.get(main, componentName) || main
+        var instanceComponents = instance.components
         var args = [e];
 
         [].slice.call(arguments, 2).forEach(function (element, i) {
@@ -346,7 +372,7 @@ module.exports = function (CustomComponent, componentName) {
           var propertyName = camelcase(name)
           var arg
 
-          if (instance.components.hasOwnProperty(propertyName)) {
+          if (instanceComponents && instanceComponents.hasOwnProperty(propertyName)) {
             arg = instance.components[propertyName]
             if (Array.isArray(arg)) {
               arg.some(function (member) {
@@ -368,10 +394,9 @@ module.exports = function (CustomComponent, componentName) {
         return cb.apply(instance, args)
       })
 
-      return matcher
+      return action
     }
-
-    return matcher
+    return action
   }
 
   CustomComponent.event = function (type, definition) {
@@ -645,7 +670,7 @@ function findParent( selector, el, e ){
     switch( typeof selector ){
         case "string":
             while( target && target != el ){
-                if( target.matches(selector) ) return target
+                if( target.matches && target.matches(selector) ) return target
                 target = target.parentNode
             }
             break
@@ -785,7 +810,6 @@ function assignSubComponents (obj, subComponents, transform, assign) {
     getComponentNameList(element, false).forEach(function (name) {
       var subName = getSubComponentName(name, true)
       element = typeof transform == "function"
-          // TODO: subclass subcomponents should be handled properly (B extends A that has a subcomponent A:a becomes B:a that's not in the registry)
           ? transform(element, name)
           : element
       if (typeof assign == "function") {
